@@ -33,7 +33,6 @@ body{
   background:var(--ink);
   overflow:hidden;
 }
-/* Ambient royal backdrop */
 .backdrop{position:fixed;inset:0;z-index:0;background:
   radial-gradient(900px 600px at 12% -10%, rgba(241,90,34,.22), transparent 60%),
   radial-gradient(700px 500px at 105% 15%, rgba(232,180,74,.14), transparent 60%),
@@ -60,6 +59,13 @@ body{
   box-shadow:0 10px 34px rgba(241,90,34,.45);position:relative}
 .crest::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--ink-2)}
 .crest span{position:relative;z-index:1;font-family:var(--font-display);font-size:34px;color:var(--gold)}
+.crest img, .mini-crest img{
+  position:relative;z-index:1;
+  width:72%;height:72%;
+  object-fit:contain;
+  border-radius:0;
+  padding:0;
+}
 .login-card h1{font-family:var(--font-display);font-size:30px;letter-spacing:.5px;font-weight:400}
 .login-card h1 em{color:var(--orange);font-style:normal}
 .login-sub{color:var(--cream-dim);font-size:13.5px;margin:6px 0 30px;letter-spacing:.4px}
@@ -77,6 +83,12 @@ body{
 .login-err{display:none;margin-top:14px;padding:10px;border-radius:10px;font-size:13px;color:#ffb3a0;
   background:rgba(241,90,34,.12);border:1px solid rgba(241,90,34,.35)}
 .login-foot{margin-top:26px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(238,238,228,.35)}
+.sync-pill{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:6px 13px;border-radius:99px;
+  font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cream-dim);
+  background:var(--glass);border:1px solid var(--glass-border)}
+.sync-pill i{width:7px;height:7px;border-radius:50%;background:#888;font-style:normal}
+.sync-pill.ok i{background:#5BE38A;box-shadow:0 0 8px #5BE38A}
+.sync-pill.off i{background:#E8B44A}
 
 /* ============ APP SHELL ============ */
 .app{position:relative;z-index:2;display:none;height:100%;}
@@ -90,6 +102,7 @@ body{
   background:conic-gradient(from 200deg,var(--orange),var(--gold),var(--orange-soft),var(--orange));position:relative;box-shadow:0 6px 18px rgba(241,90,34,.4)}
 .brand .mini-crest::after{content:"";position:absolute;inset:3px;border-radius:11px;background:var(--ink-2)}
 .brand .mini-crest span{position:relative;z-index:1;font-family:var(--font-display);font-size:22px;color:var(--gold)}
+.mini-crest img{padding:4px}
 .brand-name{font-family:var(--font-display);font-size:19px;line-height:1.1}
 .brand-name em{color:var(--orange);font-style:normal}
 .brand-tag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cream-dim)}
@@ -176,7 +189,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 /* Toast */
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(80px);z-index:99;opacity:0;
   padding:13px 22px;border-radius:14px;font-size:13.5px;font-weight:500;color:var(--cream);
-  background:rgba(35,26,20,.9);border:1px solid var(--glass-border-hot); -webkit-backdrop-filter: blur(14px) ; backdrop-filter:blur(14px);
+  background:rgba(35,26,20,.9);border:1px solid var(--glass-border-hot);backdrop-filter:blur(14px);
   box-shadow:0 14px 34px rgba(0,0,0,.5);transition:.35s cubic-bezier(.2,.8,.2,1);max-width:90vw;text-align:center}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
@@ -194,17 +207,6 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
   .topbar{padding:12px 14px}
   .open-ext{padding:9px 11px}
 }
-
-
-
-.crest img, .mini-crest img{
-  position:relative;z-index:1;
-  width:100%;height:100%;
-  object-fit:contain;      /* shows the FULL logo, never crops */
-  padding:8px;             /* breathing room so edges are visible */
-  border-radius:0%;
-}
-.mini-crest img{padding:5px;border-radius:11px}
 </style>
 </head>
 <body>
@@ -227,6 +229,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
     </div>
     <button class="btn btn-royal" onclick="doLogin()">Sign in</button>
     <div class="login-err" id="loginErr">Incorrect username or password.</div>
+    <div class="sync-pill" id="syncPill"><i></i><span id="syncText">Connecting…</span></div>
     <div class="login-foot">ODEA Development · Coimbatore</div>
   </div>
 </div>
@@ -236,7 +239,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
   <div class="scrim" id="scrim" onclick="toggleSide(false)"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="crest"><img src="logo.png" alt="ODEA logo"></div>
+      <div class="mini-crest"><img src="logo.png" alt="ODEA"></div>
       <div>
         <div class="brand-name">ODEA <em>Development</em></div>
         <div class="brand-tag">Sheets Hub</div>
@@ -244,7 +247,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
     </div>
     <div class="side-head">
       <h3>Sheet Folders</h3>
-      <button class="btn add-btn" title="Add a Google Sheet" onclick="openModal('addModal')">+</button>
+      <button class="btn add-btn" id="addBtn" title="Add a Google Sheet" onclick="openModal('addModal')">+</button>
     </div>
     <nav class="folder-list" id="folderList"></nav>
     <div class="side-foot">
@@ -265,13 +268,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
       <a class="open-ext" id="openExt" href="#" target="_blank" style="display:none">Open in Google ↗</a>
     </div>
-    <div class="stage" id="stage">
-      <div class="welcome">
-        <div class="crest"><img src="logo.png" alt="ODEA logo"></div>
-        <h2>Your sheets, one <em>royal</em> desk.</h2>
-        <p>Pick a folder from the left to open it here — every inner sheet tab (Sheet1, Sheet2…) stays fully editable. Use the <b style="color:var(--orange)">+</b> button to add a new Google Sheet by pasting its link.</p>
-      </div>
-    </div>
+    <div class="stage" id="stage"></div>
   </main>
 </div>
 
@@ -279,7 +276,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 <div class="overlay" id="addModal">
   <div class="modal">
     <h3>Add a Google Sheet</h3>
-    <p class="m-sub">Open your sheet in Google → click <b>Share</b> → set <b>“Anyone with the link – Editor”</b> (so it can be edited here) → copy the link and paste it below.</p>
+    <p class="m-sub">Open your sheet in Google → click <b>Share</b> → set <b>“Anyone with the link – Editor”</b> (so it can be edited here) → copy the link and paste it below. It will appear for <b>everyone, on every device</b>.</p>
     <div class="field">
       <label>Display name</label>
       <input id="sheetName" placeholder="e.g. Annamalayar Leads 2026">
@@ -303,7 +300,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 <div class="overlay" id="usersModal">
   <div class="modal">
     <h3>Manage users</h3>
-    <p class="m-sub">Users created here are saved on <b>this browser</b>. To make a login permanent for everyone on every device, add it to the <b>USERS list</b> at the top of index.html and push to GitHub.</p>
+    <p class="m-sub">Users created here are saved in the cloud and can sign in from <b>any device</b>.</p>
     <div id="userRows"></div>
     <div class="divider"></div>
     <div class="field"><label>New username</label><input id="nuName" placeholder="e.g. priya"></div>
@@ -320,34 +317,80 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 
 <div class="toast" id="toast"></div>
 
+<!-- Firebase (loaded from Google's CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
 <script>
 /* =====================================================================
-   ⚙️  YOUR SETTINGS — EDIT ONLY THIS BLOCK
-   These logins work on EVERY device. Change the admin password before
-   going live. You can add more permanent users to this list too.
+   ⚙️  STEP 1 — PERMANENT ADMIN LOGIN (works even if cloud is down)
+   Change this before going live. This is your master key.
 ===================================================================== */
 const USERS = [
-  { user: "admin",  pass: "Odea@2026", role: "admin"  },
-  // { user: "teammate", pass: "SomePass123", role: "member" },
+  { user: "admin", pass: "Odea@2026", role: "admin" },
 ];
 
-/* Optional: pre-load sheets that appear for everyone on every device.
-   Get the link from Google Sheets → Share → Copy link.               */
-const DEFAULT_SHEETS = [
-  // { name: "Client Report Master", url: "https://docs.google.com/spreadsheets/d/XXXX/edit", icon: "📊" },
-];
+/* =====================================================================
+   ⚙️  STEP 2 — PASTE YOUR FIREBASE CONFIG BETWEEN THE BRACES BELOW
+   (I'll tell you exactly where to copy this from — it looks identical,
+   with your own values. Until you paste it, the app still works in
+   offline/local mode on each browser separately.)
+===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDJQwWDb2csMhg-i_84TZH0VNpswFm1yh4",
+  authDomain: "odea-hub.firebaseapp.com",
+  databaseURL: "https://odea-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "odea-hub",
+  storageBucket: "odea-hub.firebasestorage.app",
+  messagingSenderId: "198528619994",
+  appId: "1:198528619994:web:093b8522eb4fcd3c239ce3"
+};
 /* ===================== end of settings ============================ */
 
 const LS_SHEETS="odea_sheets", LS_LOCALUSERS="odea_users", LS_SESSION="odea_session";
-let sheets=[], activeId=null;
+let sheets=[], cloudUsers=[], activeId=null, db=null, cloudOn=false;
 
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
 function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2600);}
 function openModal(id){$(id).classList.add("on")}
 function closeModal(id){$(id).classList.remove("on")}
-function allUsers(){return USERS.concat(JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]"));}
+function esc(t){return String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function session(){try{return JSON.parse(sessionStorage.getItem(LS_SESSION))}catch(e){return null}}
+function isAdminNow(){const s=session();return s&&s.role==="admin";}
+function setPill(state,text){const p=$("syncPill");p.className="sync-pill "+state;$("syncText").textContent=text;}
+
+/* ---------- cloud boot ---------- */
+function bootCloud(){
+  if(!FIREBASE_CONFIG.apiKey){ setPill("off","Local mode"); loadLocalSheets(); return; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db=firebase.database(); cloudOn=true;
+    setPill("ok","Cloud sync on");
+    // live-sync sheets: any change by anyone updates every open dashboard instantly
+    db.ref("sheets").on("value",snap=>{
+      const v=snap.val()||{};
+      sheets=Object.keys(v).map(k=>({id:k,...v[k]}));
+      sheets.sort((a,b)=>(a.ts||0)-(b.ts||0));
+      renderFolders();
+    },err=>{ setPill("off","Cloud error — local mode"); cloudOn=false; loadLocalSheets(); });
+    // live-sync users
+    db.ref("users").on("value",snap=>{
+      const v=snap.val()||{};
+      cloudUsers=Object.keys(v).map(k=>({user:k,...v[k]}));
+      if($("usersModal").classList.contains("on")) renderUsers();
+    });
+  }catch(e){ setPill("off","Local mode"); loadLocalSheets(); }
+}
+function loadLocalSheets(){
+  sheets=JSON.parse(localStorage.getItem(LS_SHEETS)||"[]");
+  renderFolders();
+}
+function persistLocal(){localStorage.setItem(LS_SHEETS,JSON.stringify(sheets));}
+function allUsers(){
+  const local=cloudOn?[]:JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
+  return USERS.concat(cloudUsers).concat(local);
+}
 
 /* ---------- auth ---------- */
 function doLogin(){
@@ -358,7 +401,9 @@ function doLogin(){
   enterApp();
 }
 function doLogout(){sessionStorage.removeItem(LS_SESSION);location.reload();}
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&$("loginView").style.display!=="none")doLogin();});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Enter" && $("loginView").style.display!=="none") doLogin();
+});
 
 function enterApp(){
   const s=session(); if(!s) return;
@@ -367,54 +412,60 @@ function enterApp(){
   $("whoName").textContent=s.user;
   $("whoRole").textContent=s.role;
   $("avatar").textContent=s.user[0].toUpperCase();
-  $("usersBtn").style.display = s.role==="admin" ? "" : "none";
-  loadSheets(); renderFolders();
+  const isAdmin=s.role==="admin";
+  $("usersBtn").style.display=isAdmin?"":"none";
+  $("addBtn").style.display=isAdmin?"":"none";
+  showWelcome(); renderFolders();
 }
 
 /* ---------- sheets ---------- */
-function loadSheets(){
-  const saved=JSON.parse(localStorage.getItem(LS_SHEETS)||"null");
-  sheets = saved!==null ? saved : DEFAULT_SHEETS.map((s,i)=>({id:"d"+i,...s}));
-  if(saved===null) persist();
-}
-function persist(){localStorage.setItem(LS_SHEETS,JSON.stringify(sheets));}
-function extractId(url){const m=url.match(/\/spreadsheets\/d\/([a-zA-Z0-9\-_]+)/);return m?m[1]:null;}
+function extractId(url){const m=String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9\-_]+)/);return m?m[1]:null;}
 
 function addSheet(){
+  if(!isAdminNow()){toast("Only admins can add sheets");return;}
   const name=$("sheetName").value.trim(), url=$("sheetUrl").value.trim();
   const icon=$("sheetIcon").value.trim()||"📄";
   if(!name){toast("Give the sheet a display name");return;}
   const gid=extractId(url);
   if(!gid){toast("That doesn't look like a Google Sheets link");return;}
-  sheets.push({id:Date.now().toString(36),name,gid,icon});
-  persist(); renderFolders(); closeModal("addModal");
+  if(cloudOn){
+    db.ref("sheets").push({name,gid,icon,ts:Date.now()})
+      .then(()=>toast("“"+name+"” added for everyone ✓"))
+      .catch(()=>toast("Cloud save failed — check internet"));
+  }else{
+    sheets.push({id:Date.now().toString(36),name,gid,icon});
+    persistLocal(); renderFolders();
+    toast("“"+name+"” added (this browser only — cloud not connected)");
+  }
+  closeModal("addModal");
   $("sheetName").value=$("sheetUrl").value=$("sheetIcon").value="";
-  toast("“"+name+"” added ✓");
 }
 function delSheet(ev,id){
   ev.stopPropagation();
-  const s=sheets.find(x=>x.id===id);
+  if(!isAdminNow()){toast("Only admins can remove sheets");return;}
+  const s=sheets.find(x=>x.id===id); if(!s)return;
   if(!confirm("Remove “"+s.name+"” from the dashboard? (The Google Sheet itself is not deleted.)"))return;
-  sheets=sheets.filter(x=>x.id!==id); persist();
+  if(cloudOn){ db.ref("sheets/"+id).remove(); }
+  else{ sheets=sheets.filter(x=>x.id!==id); persistLocal(); renderFolders(); }
   if(activeId===id){activeId=null;showWelcome();}
-  renderFolders();
 }
 function renderFolders(){
-  const list=$("folderList");
-  if(!sheets.length){list.innerHTML='<div class="empty-hint">No sheets yet.<br>Tap the <b>+</b> above and paste a Google Sheet link to begin.</div>';return;}
+  const list=$("folderList"); if(!list)return;
+  if(!sheets.length){
+    list.innerHTML='<div class="empty-hint">No sheets yet.<br>Tap the <b>+</b> above and paste a Google Sheet link to begin.</div>';
+    return;
+  }
   list.innerHTML=sheets.map(s=>`
     <div class="folder ${s.id===activeId?'active':''}" onclick="openSheet('${s.id}')">
       <div class="folder-ico">${s.icon||"📄"}</div>
       <div class="folder-meta"><b>${esc(s.name)}</b><small>Google Sheet</small></div>
-      <button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>
+      ${isAdminNow()?`<button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
     </div>`).join("");
 }
-function esc(t){return t.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-
 function openSheet(id){
   const s=sheets.find(x=>x.id===id); if(!s)return;
   activeId=id; renderFolders(); toggleSide(false);
-  const gid = s.gid || extractId(s.url||"");
+  const gid=s.gid||extractId(s.url||"");
   const embed=`https://docs.google.com/spreadsheets/d/${gid}/edit?rm=minimal&widget=true&chrome=false`;
   $("stage").innerHTML=`<div class="sheet-frame-wrap"><iframe src="${embed}" allow="clipboard-read; clipboard-write"></iframe></div>`;
   $("stageTitle").innerHTML=`<span class="live-dot"></span>${esc(s.name)}`;
@@ -423,43 +474,62 @@ function openSheet(id){
 function showWelcome(){
   $("stageTitle").innerHTML='<span class="live-dot"></span>Welcome';
   $("openExt").style.display="none";
-  $("stage").innerHTML=document.querySelector("#appView") ? `
-    <div class="welcome"><div class="crest"><img src="logo.png" alt="ODEA"></div>
-    <h2>Your sheets, one <em>royal</em> desk.</h2>
-    <p>Pick a folder from the left to open it here. Use the <b style="color:var(--orange)">+</b> button to add a new Google Sheet.</p></div>`:"";
+  $("stage").innerHTML=`
+    <div class="welcome">
+      <div class="crest"><img src="logo.png" alt="ODEA"></div>
+      <h2>Your sheets, one <em>royal</em> desk.</h2>
+      <p>Pick a folder from the left to open it here — every inner sheet tab stays fully editable. Sheets added by an admin appear for everyone, on every device.</p>
+    </div>`;
 }
 
 /* ---------- users (admin) ---------- */
 function openUsers(){renderUsers();openModal("usersModal");}
-function localUsers(){return JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");}
 function renderUsers(){
   const rows=$("userRows");
-  const perm=USERS.map(u=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · permanent</small></div></div>`).join("");
-  const loc=localUsers().map((u,i)=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px;background:linear-gradient(135deg,#7A5CE0,#E8B44A)">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · this browser</small></div><button class="btn tiny-del" onclick="delUser(${i})">✕</button></div>`).join("");
-  rows.innerHTML=perm+loc;
+  const perm=USERS.map(u=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · master</small></div></div>`).join("");
+  const cloud=cloudUsers.map(u=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px;background:linear-gradient(135deg,#7A5CE0,#E8B44A)">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · cloud</small></div><button class="btn tiny-del" onclick="delCloudUser('${esc(u.user)}')">✕</button></div>`).join("");
+  const local=cloudOn?"":JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]").map((u,i)=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · this browser</small></div><button class="btn tiny-del" onclick="delLocalUser(${i})">✕</button></div>`).join("");
+  rows.innerHTML=perm+cloud+local;
 }
 function addUser(){
+  if(!isAdminNow()){toast("Only admins can create users");return;}
   const name=$("nuName").value.trim(), pass=$("nuPass").value, role=$("nuRole").value;
   if(!name||!pass){toast("Username and password required");return;}
+  if(/[.#$\[\]\/]/.test(name)){toast("Username can't contain . # $ [ ] /");return;}
   if(allUsers().some(u=>u.user.toLowerCase()===name.toLowerCase())){toast("That username already exists");return;}
-  const arr=localUsers(); arr.push({user:name,pass,role});
-  localStorage.setItem(LS_LOCALUSERS,JSON.stringify(arr));
-  $("nuName").value=$("nuPass").value=""; renderUsers(); toast("User “"+name+"” created ✓");
+  if(cloudOn){
+    db.ref("users/"+name).set({pass,role})
+      .then(()=>{toast("User “"+name+"” created — can sign in anywhere ✓");})
+      .catch(()=>toast("Cloud save failed"));
+  }else{
+    const arr=JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
+    arr.push({user:name,pass,role});
+    localStorage.setItem(LS_LOCALUSERS,JSON.stringify(arr));
+    toast("User created (this browser only — cloud not connected)");
+    renderUsers();
+  }
+  $("nuName").value=$("nuPass").value="";
 }
-function delUser(i){
-  const arr=localUsers(); const u=arr[i];
-  if(!confirm("Delete user “"+u.user+"”?"))return;
+function delCloudUser(name){
+  if(!isAdminNow())return;
+  if(!confirm("Delete user “"+name+"”?"))return;
+  db.ref("users/"+name).remove();
+}
+function delLocalUser(i){
+  const arr=JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
+  if(!confirm("Delete user “"+arr[i].user+"”?"))return;
   arr.splice(i,1); localStorage.setItem(LS_LOCALUSERS,JSON.stringify(arr)); renderUsers();
 }
 
 /* ---------- mobile sidebar ---------- */
 function toggleSide(force){
   const sb=$("sidebar"), sc=$("scrim");
-  const on = force!==undefined ? force : !sb.classList.contains("open");
+  const on=force!==undefined?force:!sb.classList.contains("open");
   sb.classList.toggle("open",on); sc.classList.toggle("on",on);
 }
 
 /* ---------- boot ---------- */
+bootCloud();
 if(session()) enterApp();
 </script>
 </body>
