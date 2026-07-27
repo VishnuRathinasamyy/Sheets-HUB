@@ -140,11 +140,18 @@ body{
   background:var(--glass);border:1px solid var(--glass-border)}
 .ghost-btn:hover{background:var(--glass-strong);border-color:var(--glass-border-hot)}
 
+
+.folder-del,.folder-edit{opacity:0;width:26px;height:26px;border-radius:8px;background:transparent;color:var(--cream-dim);font-size:15px;flex-shrink:0}
+.folder:hover .folder-del,.folder:hover .folder-edit{opacity:1}
+.folder-del:hover{background:rgba(241,90,34,.25);color:#fff}
+.folder-edit:hover{background:rgba(232,180,74,.25);color:#fff}
+.folder-edit{font-size:13px}
+
 /* ============ MAIN ============ */
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
 .topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;
   background:rgba(255,255,255,.04);border-bottom:1px solid var(--glass-border);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.burger{display:none;width:38px;height:38px;border-radius:11px;background:var(--glass);border:1px solid var(--glass-border);color:var(--cream);font-size:17px}
+.burger{display:flex;align-items:center;justify-content:center;flex-shrink:0;height:38px;width: 44px;border-radius:11px;background:var(--glass);border:1px solid var(--glass-border);color:var(--cream);font-size:17px}
 .topbar h2{font-family:var(--font-display);font-size:19px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5BE38A;margin-right:8px;box-shadow:0 0 10px #5BE38A;animation:pulse 2s infinite}
 @keyframes pulse{50%{opacity:.4}}
@@ -207,6 +214,14 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
   .topbar{padding:12px 14px}
   .open-ext{padding:9px 11px}
 }
+
+
+
+
+
+.sidebar.closed{width:0;min-width:0;overflow:hidden;border-right:none}
+.sidebar{transition:width .3s cubic-bezier(.2,.8,.2,1), transform .3s cubic-bezier(.2,.8,.2,1)}
+
 </style>
 </head>
 <body>
@@ -264,7 +279,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 
   <main class="main">
     <div class="topbar">
-      <button class="btn burger" onclick="toggleSide()">☰</button>
+      <button class="btn burger" onclick="smartToggle()">☰</button>
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
       <a class="open-ext" id="openExt" href="#" target="_blank" style="display:none">Open in Google ↗</a>
     </div>
@@ -303,7 +318,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
     <p class="m-sub">Users created here are saved in the cloud and can sign in from <b>any device</b>.</p>
     <div id="userRows"></div>
     <div class="divider"></div>
-    <div class="field"><label>New username</label><input id="nuName" placeholder="e.g. priya"></div>
+    <div class="field"><label>New username</label><input id="nuName" placeholder="e.g. Deepika"></div>
     <div class="field"><label>Password</label><input id="nuPass" placeholder="Choose a password"></div>
     <div class="field"><label>Role</label>
       <select class="f-input" id="nuRole"><option value="member">Member</option><option value="admin">Admin</option></select>
@@ -410,6 +425,7 @@ function enterApp(){
   $("loginView").style.display="none";
   $("appView").classList.add("on");
   $("whoName").textContent=s.user;
+  $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome, ${esc(s.user)}`;
   $("whoRole").textContent=s.role;
   $("avatar").textContent=s.user[0].toUpperCase();
   const isAdmin=s.role==="admin";
@@ -449,6 +465,24 @@ function delSheet(ev,id){
   else{ sheets=sheets.filter(x=>x.id!==id); persistLocal(); renderFolders(); }
   if(activeId===id){activeId=null;showWelcome();}
 }
+
+
+
+function editSheet(ev,id){
+  ev.stopPropagation();
+  if(!isAdminNow()){toast("Only admins can rename sheets");return;}
+  const s=sheets.find(x=>x.id===id); if(!s)return;
+  const newName=prompt("New name for this sheet:",s.name);
+  if(newName===null)return;                      // cancelled
+  const nm=newName.trim();
+  if(!nm){toast("Name can't be empty");return;}
+  if(cloudOn){
+    db.ref("sheets/"+id+"/name").set(nm).then(()=>toast("Renamed ✓"));
+  }else{
+    s.name=nm; persistLocal(); renderFolders(); toast("Renamed ✓");
+  }
+  if(activeId===id) $("stageTitle").innerHTML=`<span class="live-dot"></span>${esc(nm)}`;
+}
 function renderFolders(){
   const list=$("folderList"); if(!list)return;
   if(!sheets.length){
@@ -459,7 +493,7 @@ function renderFolders(){
     <div class="folder ${s.id===activeId?'active':''}" onclick="openSheet('${s.id}')">
       <div class="folder-ico">${s.icon||"📄"}</div>
       <div class="folder-meta"><b>${esc(s.name)}</b><small>Google Sheet</small></div>
-      ${isAdminNow()?`<button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
+      ${isAdminNow()?`<button class="btn folder-edit" title="Rename" onclick="editSheet(event,'${s.id}')">✏️</button><button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
     </div>`).join("");
 }
 function openSheet(id){
@@ -472,7 +506,9 @@ function openSheet(id){
   const ext=$("openExt"); ext.style.display=""; ext.href=`https://docs.google.com/spreadsheets/d/${gid}/edit`;
 }
 function showWelcome(){
-  $("stageTitle").innerHTML='<span class="live-dot"></span>Welcome';
+  const s=session();
+  // $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome${s?", "+esc(s.user):""}`;
+  $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome${s?", "+esc(s.user[0].toUpperCase()+s.user.slice(1)):""}`;
   $("openExt").style.display="none";
   $("stage").innerHTML=`
     <div class="welcome">
@@ -526,6 +562,12 @@ function toggleSide(force){
   const sb=$("sidebar"), sc=$("scrim");
   const on=force!==undefined?force:!sb.classList.contains("open");
   sb.classList.toggle("open",on); sc.classList.toggle("on",on);
+}
+
+
+function smartToggle(){
+  if(window.innerWidth>860){ $("sidebar").classList.toggle("closed"); }
+  else{ toggleSide(); }
 }
 
 /* ---------- boot ---------- */
