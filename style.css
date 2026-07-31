@@ -328,3 +328,13 @@ body.light .overlay{background:rgba(80,60,40,.35)}
 .pin-btn:hover{background:rgba(232,180,74,.25);color:#fff}
 .pin-head{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);padding:4px 12px 6px}
 .pin-sep{height:1px;background:var(--glass-border);margin:8px 12px 10px}
+
+/* Sheet names wrap instead of truncating */
+.folder-meta b{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.25}
+.folder-meta small{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+.folder{align-items:flex-start}
+.folder-ico,.status-chip{margin-top:1px}
+
+.folder-edit,.folder-del,.pin-btn{width:22px;height:22px;font-size:12px}
+.folder{padding:12px 8px;gap:8px}
+.folder-meta b{font-size:13.5px}
