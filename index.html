@@ -3,230 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ODEA Sheets Hub</title>
-<link rel="icon" type="image/png" href="Sheets HUB logo.webp">
-<link rel="apple-touch-icon" href="Sheets HUB logo.webp">
+<title>ODEA Sheets HUB</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
 <meta name="theme-color" content="#1A1A1A">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-/* ============ ODEA ROYAL GLASS TOKENS ============ */
-:root{
-  --orange:#F15A22;
-  --orange-soft:#FF7300;
-  --gold:#E8B44A;
-  --ink:#120D0A;
-  --ink-2:#1D1512;
-  --cream:#EEEEE4;
-  --cream-dim:rgba(238,238,228,.62);
-  --glass:rgba(255,255,255,.055);
-  --glass-strong:rgba(255,255,255,.09);
-  --glass-border:rgba(255,255,255,.14);
-  --glass-border-hot:rgba(241,90,34,.55);
-  --shadow:0 24px 60px rgba(0,0,0,.55);
-  --radius:20px;
-  --font-display:'Marcellus',serif;
-  --font-ui:'Outfit',sans-serif;
-}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%}
-body{
-  font-family:var(--font-ui);
-  color:var(--cream);
-  background:var(--ink);
-  overflow:hidden;
-}
-.backdrop{position:fixed;inset:0;z-index:0;background:
-  radial-gradient(900px 600px at 12% -10%, rgba(241,90,34,.22), transparent 60%),
-  radial-gradient(700px 500px at 105% 15%, rgba(232,180,74,.14), transparent 60%),
-  radial-gradient(800px 700px at 50% 115%, rgba(120,60,200,.14), transparent 60%),
-  linear-gradient(160deg,#171008 0%,#120D0A 45%,#0D0A14 100%);}
-.backdrop::after{content:"";position:absolute;inset:0;
-  background-image:radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px);
-  background-size:26px 26px;opacity:.5}
-.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;animation:drift 16s ease-in-out infinite alternate}
-.orb.a{width:340px;height:340px;background:rgba(241,90,34,.30);top:-90px;left:-70px}
-.orb.b{width:280px;height:280px;background:rgba(232,180,74,.20);bottom:-60px;right:-40px;animation-delay:-8s}
-@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,40px) scale(1.12)}}
-@media (prefers-reduced-motion: reduce){.orb{animation:none}}
-
-/* ============ LOGIN ============ */
-.login-wrap{position:relative;z-index:2;height:100%;display:flex;align-items:center;justify-content:center;padding:22px}
-.login-card{width:min(430px,100%);padding:46px 40px 40px;border-radius:28px;
-  background:linear-gradient(150deg,rgba(255,255,255,.10),rgba(255,255,255,.03));
-  border:1px solid var(--glass-border);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
-  box-shadow:var(--shadow);text-align:center;animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
-@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
-.crest{width:74px;height:74px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  background:conic-gradient(from 200deg,var(--orange),var(--gold),var(--orange-soft),var(--orange));
-  box-shadow:0 10px 34px rgba(241,90,34,.45);position:relative}
-.crest::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--ink-2)}
-.crest span{position:relative;z-index:1;font-family:var(--font-display);font-size:34px;color:var(--gold)}
-.crest img, .mini-crest img{
-  position:relative;z-index:1;
-  width:72%;height:72%;
-  object-fit:contain;
-  border-radius:0;
-  padding:0;
-}
-.login-card h1{font-family:var(--font-display);font-size:30px;letter-spacing:.5px;font-weight:400}
-.login-card h1 em{color:var(--orange);font-style:normal}
-.login-sub{color:var(--cream-dim);font-size:13.5px;margin:6px 0 30px;letter-spacing:.4px}
-.field{position:relative;margin-bottom:16px;text-align:left}
-.field label{display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:7px}
-.field input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--glass-border);
-  background:rgba(0,0,0,.28);color:var(--cream);font:500 15px var(--font-ui);outline:none;transition:.25s}
-.field input:focus{border-color:var(--glass-border-hot);box-shadow:0 0 0 4px rgba(241,90,34,.15)}
-.btn{cursor:pointer;border:none;font-family:var(--font-ui);transition:.22s}
-.btn-royal{width:100%;margin-top:8px;padding:15px;border-radius:14px;font-size:15px;font-weight:600;letter-spacing:.6px;color:#fff;
-  background:linear-gradient(120deg,var(--orange),var(--orange-soft));
-  box-shadow:0 12px 30px rgba(241,90,34,.4)}
-.btn-royal:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(241,90,34,.55)}
-.btn-royal:active{transform:translateY(0)}
-.login-err{display:none;margin-top:14px;padding:10px;border-radius:10px;font-size:13px;color:#ffb3a0;
-  background:rgba(241,90,34,.12);border:1px solid rgba(241,90,34,.35)}
-.login-foot{margin-top:26px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(238,238,228,.35)}
-.sync-pill{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:6px 13px;border-radius:99px;
-  font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cream-dim);
-  background:var(--glass);border:1px solid var(--glass-border)}
-.sync-pill i{width:7px;height:7px;border-radius:50%;background:#888;font-style:normal}
-.sync-pill.ok i{background:#5BE38A;box-shadow:0 0 8px #5BE38A}
-.sync-pill.off i{background:#E8B44A}
-
-/* ============ APP SHELL ============ */
-.app{position:relative;z-index:2;display:none;height:100%;}
-.app.on{display:flex}
-.sidebar{width:292px;flex-shrink:0;height:100%;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.028));
-  border-right:1px solid var(--glass-border);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  transition:transform .3s cubic-bezier(.2,.8,.2,1)}
-.brand{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-.brand .mini-crest{width:44px;height:44px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-  background:conic-gradient(from 200deg,var(--orange),var(--gold),var(--orange-soft),var(--orange));position:relative;box-shadow:0 6px 18px rgba(241,90,34,.4)}
-.brand .mini-crest::after{content:"";position:absolute;inset:3px;border-radius:11px;background:var(--ink-2)}
-.brand .mini-crest span{position:relative;z-index:1;font-family:var(--font-display);font-size:22px;color:var(--gold)}
-.mini-crest img{padding:4px}
-.brand-name{font-family:var(--font-display);font-size:19px;line-height:1.1}
-.brand-name em{color:var(--orange);font-style:normal}
-.brand-tag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cream-dim)}
-.side-head{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 10px}
-.side-head h3{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cream-dim);font-weight:600}
-.add-btn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff;
-  background:linear-gradient(120deg,var(--orange),var(--orange-soft));box-shadow:0 6px 16px rgba(241,90,34,.4)}
-.add-btn:hover{transform:rotate(90deg) scale(1.08)}
-.folder-list{flex:1;overflow-y:auto;padding:4px 12px 12px;scrollbar-width:thin;scrollbar-color:rgba(241,90,34,.5) transparent}
-.folder-list::-webkit-scrollbar{width:5px}
-.folder-list::-webkit-scrollbar-thumb{background:rgba(241,90,34,.5);border-radius:99px}
-.folder{display:flex;align-items:center;gap:11px;padding:12px 12px;margin-bottom:6px;border-radius:14px;cursor:pointer;
-  border:1px solid transparent;transition:.2s;position:relative}
-.folder:hover{background:var(--glass);border-color:var(--glass-border)}
-.folder.active{background:linear-gradient(120deg,rgba(241,90,34,.22),rgba(232,180,74,.10));border-color:var(--glass-border-hot)}
-.folder-ico{width:36px;height:36px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;
-  background:rgba(255,255,255,.07);border:1px solid var(--glass-border)}
-.folder.active .folder-ico{background:rgba(241,90,34,.3)}
-.folder-meta{min-width:0;flex:1}
-.folder-meta b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.folder-meta small{font-size:11px;color:var(--cream-dim)}
-.folder-del{opacity:0;width:26px;height:26px;border-radius:8px;background:transparent;color:var(--cream-dim);font-size:15px;flex-shrink:0}
-.folder:hover .folder-del{opacity:1}
-.folder-del:hover{background:rgba(241,90,34,.25);color:#fff}
-.empty-hint{padding:26px 16px;text-align:center;color:var(--cream-dim);font-size:13px;line-height:1.6}
-.empty-hint b{color:var(--orange)}
-.side-foot{padding:14px 16px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:8px}
-.user-chip{display:flex;align-items:center;gap:10px}
-.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;
-  background:linear-gradient(135deg,var(--orange),var(--gold))}
-.user-chip .who b{display:block;font-size:13.5px}
-.user-chip .who small{font-size:11px;color:var(--cream-dim);text-transform:capitalize}
-.foot-actions{display:flex;gap:8px}
-.ghost-btn{flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--cream);
-  background:var(--glass);border:1px solid var(--glass-border)}
-.ghost-btn:hover{background:var(--glass-strong);border-color:var(--glass-border-hot)}
-
-
-.folder-del,.folder-edit{opacity:0;width:26px;height:26px;border-radius:8px;background:transparent;color:var(--cream-dim);font-size:15px;flex-shrink:0}
-.folder:hover .folder-del,.folder:hover .folder-edit{opacity:1}
-.folder-del:hover{background:rgba(241,90,34,.25);color:#fff}
-.folder-edit:hover{background:rgba(232,180,74,.25);color:#fff}
-.folder-edit{font-size:13px}
-
-/* ============ MAIN ============ */
-.main{flex:1;display:flex;flex-direction:column;min-width:0}
-.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;
-  background:rgba(255,255,255,.04);border-bottom:1px solid var(--glass-border);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.burger{display:flex;align-items:center;justify-content:center;flex-shrink:0;height:38px;width: 44px;border-radius:11px;background:var(--glass);border:1px solid var(--glass-border);color:var(--cream);font-size:17px}
-.topbar h2{font-family:var(--font-display);font-size:19px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5BE38A;margin-right:8px;box-shadow:0 0 10px #5BE38A;animation:pulse 2s infinite}
-@keyframes pulse{50%{opacity:.4}}
-.open-ext{padding:9px 15px;border-radius:11px;font-size:12.5px;font-weight:600;color:var(--cream);text-decoration:none;
-  background:var(--glass);border:1px solid var(--glass-border);white-space:nowrap}
-.open-ext:hover{border-color:var(--glass-border-hot);background:var(--glass-strong)}
-.stage{flex:1;padding:16px;min-height:0}
-.sheet-frame-wrap{height:100%;border-radius:var(--radius);overflow:hidden;border:1px solid var(--glass-border);
-  background:rgba(255,255,255,.03);box-shadow:var(--shadow);position:relative}
-.sheet-frame-wrap iframe{width:100%;height:100%;border:0;background:#fff}
-.welcome{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
-.welcome .crest{margin-bottom:4px}
-.welcome h2{font-family:var(--font-display);font-size:clamp(24px,4vw,38px);font-weight:400}
-.welcome h2 em{color:var(--orange);font-style:normal}
-.welcome p{color:var(--cream-dim);max-width:420px;font-size:14.5px;line-height:1.65}
-
-/* ============ MODALS ============ */
-.overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:20px;
-  background:rgba(10,7,5,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.overlay.on{display:flex}
-.modal{width:min(480px,100%);max-height:88vh;overflow-y:auto;padding:32px 30px;border-radius:24px;
-  background:linear-gradient(150deg,rgba(45,32,25,.92),rgba(25,18,26,.94));
-  border:1px solid var(--glass-border);box-shadow:var(--shadow);animation:rise .4s cubic-bezier(.2,.8,.2,1) both}
-.modal h3{font-family:var(--font-display);font-size:22px;font-weight:400;margin-bottom:4px}
-.modal .m-sub{color:var(--cream-dim);font-size:13px;margin-bottom:22px;line-height:1.55}
-.modal .m-sub b{color:var(--gold)}
-.m-row{display:flex;gap:10px;margin-top:20px}
-.m-row .btn{flex:1;padding:13px;border-radius:12px;font-size:14px;font-weight:600}
-.btn-cancel{background:var(--glass);border:1px solid var(--glass-border);color:var(--cream)}
-.btn-cancel:hover{background:var(--glass-strong)}
-select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--glass-border);
-  background:rgba(0,0,0,.28);color:var(--cream);font:500 15px var(--font-ui);outline:none}
-.user-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:6px;
-  background:var(--glass);border:1px solid rgba(255,255,255,.08)}
-.user-row .who{flex:1;min-width:0}
-.user-row b{font-size:13.5px;display:block}
-.user-row small{font-size:11px;color:var(--cream-dim);text-transform:capitalize}
-.tiny-del{width:28px;height:28px;border-radius:9px;background:transparent;color:var(--cream-dim);font-size:14px}
-.tiny-del:hover{background:rgba(241,90,34,.25);color:#fff}
-.divider{height:1px;background:rgba(255,255,255,.09);margin:20px 0}
-
-/* Toast */
-.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(80px);z-index:99;opacity:0;
-  padding:13px 22px;border-radius:14px;font-size:13.5px;font-weight:500;color:var(--cream);
-  background:rgba(35,26,20,.9);border:1px solid var(--glass-border-hot);backdrop-filter:blur(14px);
-  box-shadow:0 14px 34px rgba(0,0,0,.5);transition:.35s cubic-bezier(.2,.8,.2,1);max-width:90vw;text-align:center}
-.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-
-/* ============ RESPONSIVE ============ */
-@media (max-width:860px){
-  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-104%);box-shadow:var(--shadow)}
-  .sidebar.open{transform:none}
-  .burger{display:flex;align-items:center;justify-content:center}
-  .stage{padding:10px}
-  .scrim{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.5);display:none}
-  .scrim.on{display:block}
-}
-@media (max-width:480px){
-  .login-card{padding:36px 24px 30px}
-  .topbar{padding:12px 14px}
-  .open-ext{padding:9px 11px}
-}
-
-
-
-
-
-.sidebar.closed{width:0;min-width:0;overflow:hidden;border-right:none}
-.sidebar{transition:width .3s cubic-bezier(.2,.8,.2,1), transform .3s cubic-bezier(.2,.8,.2,1)}
-
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -236,7 +20,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 <div class="login-wrap" id="loginView">
   <div class="login-card">
     <div class="crest"><img src="logo.png" alt="ODEA logo"></div>
-    <h1>ODEA <em>Sheets Hub</em></h1>
+    <h1>ODEA <em>Sheets HUB</em></h1>
     <p class="login-sub">Private workspace · Sign in to continue</p>
     <div class="field">
       <label for="u">Username</label>
@@ -256,6 +40,7 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 <!-- ================= APP ================= -->
 <div class="app" id="appView">
   <div class="scrim" id="scrim" onclick="toggleSide(false)"></div>
+
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="mini-crest"><img src="logo.png" alt="ODEA"></div>
@@ -266,7 +51,10 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
     </div>
     <div class="side-head">
       <h3>Sheet Folders</h3>
-      <button class="btn add-btn" id="addBtn" title="Add a Google Sheet" onclick="openModal('addModal')">+</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn add-btn" id="newFolderBtn" title="New folder" style="background:linear-gradient(120deg,#7A5CE0,#E8B44A)" onclick="openFolderModal()">📁</button>
+        <button class="btn add-btn" id="addBtn" title="Add a Google Sheet" onclick="openAddSheet()">+</button>
+      </div>
     </div>
     <nav class="folder-list" id="folderList"></nav>
     <div class="side-foot">
@@ -275,7 +63,9 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
         <div class="who"><b id="whoName">—</b><small id="whoRole">—</small></div>
       </div>
       <div class="foot-actions">
-        <button class="btn ghost-btn" id="usersBtn" onclick="openUsers()">Users</button>
+        <button class="btn ghost-btn" id="usersBtn" onclick="openUsers()">Team</button>
+        <button class="btn ghost-btn" id="settingsBtn" onclick="openSettings()">Settings</button>
+        <button class="btn ghost-btn" onclick="openProfile()">Profile</button>
         <button class="btn ghost-btn" onclick="doLogout()">Sign out</button>
       </div>
     </div>
@@ -283,300 +73,162 @@ select.f-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid 
 
   <main class="main">
     <div class="topbar">
-      <button class="btn burger" onclick="smartToggle()">☰</button>
+      <button class="btn burger" id="burgerBtn" onclick="smartToggle()">◀</button>
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
-      <a class="open-ext" id="openExt" href="#" target="_blank" style="display:none">Open in Google ↗</a>
+      <button class="btn top-btn" id="boardBtn" onclick="showBoard()" style="background:linear-gradient(120deg,#E85A4F,#FF3B30);border-color:transparent;color:#fff;font-weight:700;box-shadow:0 6px 16px rgba(232,90,79,.4)">📋 <span class="lbl">To-Do / EOD</span></button>
+      <button class="btn top-btn" id="tasksBtn" onclick="openTasks()">🔔 <span class="lbl">Tasks</span><span class="badge" id="taskBadge" style="display:none">0</span></button>
+      <button class="btn icon-btn" id="themeBtn" onclick="toggleTheme()" title="Theme">🌙</button>
+      <a class="top-btn" id="openExt" href="#" target="_blank" style="display:none">↗ <span class="lbl">Open in Google</span></a>
     </div>
     <div class="stage" id="stage"></div>
   </main>
 </div>
 
-<!-- ============ ADD SHEET MODAL ============ -->
+<!-- ============ ADD/EDIT SHEET MODAL ============ -->
 <div class="overlay" id="addModal">
   <div class="modal">
-    <h3>Add a Google Sheet</h3>
-    <p class="m-sub">Open your sheet in Google → click <b>Share</b> → set <b>“Anyone with the link – Editor”</b> (so it can be edited here) → copy the link and paste it below. It will appear for <b>everyone, on every device</b>.</p>
-    <div class="field">
-      <label>Display name</label>
-      <input id="sheetName" placeholder="e.g. Annamalayar Leads 2026">
-    </div>
-    <div class="field">
-      <label>Google Sheet link</label>
-      <input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/....">
-    </div>
-    <div class="field">
-      <label>Icon (optional emoji)</label>
-      <input id="sheetIcon" placeholder="📊" maxlength="4">
-    </div>
+    <h3 id="addModalTitle">Add a Google Sheet</h3>
+    <p class="m-sub">Share the sheet as <b>“Anyone with the link – Editor”</b>, paste the link, and tick which teams can see it.</p>
+    <div class="field"><label>Display name</label><input id="sheetName" placeholder="e.g. Annamalayar Leads 2026"></div>
+    <div class="field"><label>Google Sheet link</label><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...."></div>
+    <div class="field"><label>Icon (optional emoji)</label><input id="sheetIcon" placeholder="📊" maxlength="4"></div>
+    <div class="field"><label>Inside folder</label><select class="f-input" id="sheetFolder"></select></div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:8px">Visible to teams</label>
+    <div class="check-grid" id="teamChecks"></div>
     <div class="m-row">
       <button class="btn btn-cancel" onclick="closeModal('addModal')">Cancel</button>
-      <button class="btn btn-royal" style="margin-top:0" onclick="addSheet()">Add sheet</button>
+      <button class="btn btn-royal" style="margin-top:0" id="sheetSaveBtn" onclick="saveSheet()">Add sheet</button>
     </div>
   </div>
 </div>
 
-<!-- ============ USERS MODAL (ADMIN) ============ -->
+<!-- ============ TEAM / USERS MODAL ============ -->
 <div class="overlay" id="usersModal">
   <div class="modal">
-    <h3>Manage users</h3>
-    <p class="m-sub">Users created here are saved in the cloud and can sign in from <b>any device</b>.</p>
+    <h3>Team members</h3>
+    <p class="m-sub">Create and manage your workers. Everything saves to the cloud — changes apply on every device instantly.</p>
     <div id="userRows"></div>
     <div class="divider"></div>
-    <div class="field"><label>New username</label><input id="nuName" placeholder="e.g. Deepika"></div>
+    <h3 style="font-size:17px" id="userFormTitle">Add member</h3>
+    <div class="field"><label>Full name (shown on board)</label><input id="nuFull" placeholder="e.g. Deepika S"></div>
+    <div class="field"><label>Username (for login)</label><input id="nuName" placeholder="e.g. Karan"></div>
     <div class="field"><label>Password</label><input id="nuPass" placeholder="Choose a password"></div>
     <div class="field"><label>Role</label>
-      <select class="f-input" id="nuRole"><option value="member">Member</option><option value="admin">Admin</option></select>
+      <!-- <select class="f-input" id="nuRole"><option value="member">Member</option><option value="admin">Admin</option></select> -->
+       <select class="f-input" id="nuRole"><option value="member">Member</option><option value="admin">Admin</option><option value="coordinator">Project Co-ordinator</option></select>
     </div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:8px">Teams (tick one or more)</label>
+    <div class="check-grid" id="nuTeamChecks"></div>
     <div class="m-row">
-      <button class="btn btn-cancel" onclick="closeModal('usersModal')">Close</button>
-      <button class="btn btn-royal" style="margin-top:0" onclick="addUser()">Create user</button>
+      <button class="btn btn-cancel" onclick="cancelUserEdit()">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0" id="userSaveBtn" onclick="saveUser()">Create member</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TASKS MODAL ============ -->
+<div class="overlay" id="tasksModal">
+  <div class="modal">
+    <h3>Tasks</h3>
+    <p class="m-sub" id="tasksSub">Tasks assigned to you appear here.</p>
+    <button class="btn btn-royal" id="newTaskBtn" style="margin:0 0 18px" onclick="openCompose()">+ Assign a task</button>
+    <div id="taskRows"></div>
+    <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('tasksModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ COMPOSE TASK MODAL (ADMIN) ============ -->
+<div class="overlay" id="composeModal">
+  <div class="modal">
+    <h3>Assign a task</h3>
+    <p class="m-sub">Write the task, style it, tick who gets it. They'll see a notification the moment they're on the dashboard.</p>
+    <div class="field"><label>Task title</label><input id="taskTitle" placeholder="e.g. SmartCliff proposal revisions"></div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:7px">Details</label>
+    <div class="editor-tools">
+      <button class="btn ed-btn" onclick="fmt('bold')" title="Bold"><b>B</b></button>
+      <button class="btn ed-btn" onclick="fmt('italic')" title="Italic"><i>I</i></button>
+      <button class="btn ed-btn" onclick="fmt('insertUnorderedList')" title="Bullet list">•≡</button>
+      <button class="btn ed-btn ed-color" onclick="fmtColor('#F15A22')" title="Orange"><i style="background:#F15A22"></i></button>
+      <button class="btn ed-btn ed-color" onclick="fmtColor('#E8B44A')" title="Gold"><i style="background:#E8B44A"></i></button>
+      <button class="btn ed-btn ed-color" onclick="fmtColor('#3DC97A')" title="Green"><i style="background:#3DC97A"></i></button>
+      <button class="btn ed-btn ed-color" onclick="fmtColor('#E85A4F')" title="Red"><i style="background:#E85A4F"></i></button>
+    </div>
+    <div class="rich-input" id="taskBody" contenteditable="true" data-ph="Write the task details here…"></div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:8px">Assign to</label>
+    <div class="check-grid" id="assignChecks"></div>
+    <div class="m-row">
+      <button class="btn btn-cancel" onclick="closeModal('composeModal')">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0" onclick="assignTask()">Assign task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL (ADMIN) ============ -->
+<div class="overlay" id="settingsModal">
+  <div class="modal">
+    <h3>Settings</h3>
+    <p class="m-sub">Everything here saves to the cloud — no code editing needed.</p>
+    <div class="field">
+      <label>To-Do / EOD archive sheet link</label>
+      <input id="archiveUrl" placeholder="https://docs.google.com/spreadsheets/d/....">
+    </div>
+    <p class="m-sub" style="margin-top:-8px">This is the Google Sheet where the board data lands every night at 12 AM. Paste a new link anytime — the change applies instantly for everyone.</p>
+    <button class="btn btn-royal" style="margin:0 0 6px" onclick="saveSettings()">Save settings</button>
+    <div class="divider"></div>
+    <h3 style="font-size:17px">Teams</h3>
+    <p class="m-sub">Add or remove teams. Teams appear in sheet visibility and member creation.</p>
+    <div class="team-chip-row" id="teamChips"></div>
+    <div class="mc-addrow" style="margin-bottom:4px">
+      <input id="newTeamName" placeholder="New team name">
+      <button class="btn mini-add todo" onclick="addTeam()">ADD</button>
+    </div>
+    <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('settingsModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="profileModal">
+  <div class="modal">
+    <h3>My profile</h3>
+    <p class="m-sub">Change your display name and photo. Visible to the whole team.</p>
+    <div style="display:flex;justify-content:center;margin-bottom:14px" id="pfPreview"></div>
+    <div class="field"><label>Display name</label><input id="pfName" placeholder="Your name"></div>
+    <div class="field"><label>Profile photo</label><input class="f-input" type="file" id="pfFile" accept="image/*" onchange="pfPickPhoto(this)"></div>
+    <button class="btn ghost-btn" style="width:100%;margin-top:-6px" onclick="clearPhoto()">Remove photo</button>
+    <div class="m-row">
+      <button class="btn btn-cancel" onclick="closeModal('profileModal')">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0" onclick="saveProfile()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirmModal">
+  <div class="modal" style="width:min(400px,100%)">
+    <h3 id="cfTitle">Are you sure?</h3>
+    <p class="m-sub" id="cfMsg">This action can't be undone.</p>
+    <div class="m-row">
+      <button class="btn btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0;background:linear-gradient(120deg,#E85A4F,#FF3B30)" id="cfYes">Yes, remove</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="folderModal">
+  <div class="modal" style="width:min(420px,100%)">
+    <h3 id="folderModalTitle">New folder</h3>
+    <p class="m-sub">Group a client's sheets together. Open the folder in the sidebar to add sheets inside it.</p>
+    <div class="field"><label>Folder name</label><input id="folderName" placeholder="e.g. Terrazzo India"></div>
+    <div class="field"><label>Icon (optional emoji)</label><input id="folderIcon" placeholder="📁" maxlength="4"></div>
+    <div class="m-row">
+      <button class="btn btn-cancel" onclick="closeModal('folderModal')">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0" id="folderSaveBtn" onclick="saveFolder()">Create folder</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<!-- Firebase (loaded from Google's CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
-<script>
-/* =====================================================================
-   ⚙️  STEP 1 — PERMANENT ADMIN LOGIN (works even if cloud is down)
-   Change this before going live. This is your master key.
-===================================================================== */
-const USERS = [
-  { user: "Odea", pass: "Odea@2026", role: "admin" },
-];
-
-/* =====================================================================
-   ⚙️  STEP 2 — PASTE YOUR FIREBASE CONFIG BETWEEN THE BRACES BELOW
-   (I'll tell you exactly where to copy this from — it looks identical,
-   with your own values. Until you paste it, the app still works in
-   offline/local mode on each browser separately.)
-===================================================================== */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDJQwWDb2csMhg-i_84TZH0VNpswFm1yh4",
-  authDomain: "odea-hub.firebaseapp.com",
-  databaseURL: "https://odea-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "odea-hub",
-  storageBucket: "odea-hub.firebasestorage.app",
-  messagingSenderId: "198528619994",
-  appId: "1:198528619994:web:093b8522eb4fcd3c239ce3"
-};
-/* ===================== end of settings ============================ */
-
-const LS_SHEETS="odea_sheets", LS_LOCALUSERS="odea_users", LS_SESSION="odea_session";
-let sheets=[], cloudUsers=[], activeId=null, db=null, cloudOn=false;
-
-/* ---------- helpers ---------- */
-const $=id=>document.getElementById(id);
-function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2600);}
-function openModal(id){$(id).classList.add("on")}
-function closeModal(id){$(id).classList.remove("on")}
-function esc(t){return String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function session(){try{return JSON.parse(sessionStorage.getItem(LS_SESSION))}catch(e){return null}}
-function isAdminNow(){const s=session();return s&&s.role==="admin";}
-function setPill(state,text){const p=$("syncPill");p.className="sync-pill "+state;$("syncText").textContent=text;}
-
-/* ---------- cloud boot ---------- */
-function bootCloud(){
-  if(!FIREBASE_CONFIG.apiKey){ setPill("off","Local mode"); loadLocalSheets(); return; }
-  try{
-    firebase.initializeApp(FIREBASE_CONFIG);
-    db=firebase.database(); cloudOn=true;
-    setPill("ok","Cloud sync on");
-    // live-sync sheets: any change by anyone updates every open dashboard instantly
-    db.ref("sheets").on("value",snap=>{
-      const v=snap.val()||{};
-      sheets=Object.keys(v).map(k=>({id:k,...v[k]}));
-      sheets.sort((a,b)=>(a.ts||0)-(b.ts||0));
-      renderFolders();
-    },err=>{ setPill("off","Cloud error — local mode"); cloudOn=false; loadLocalSheets(); });
-    // live-sync users
-    db.ref("users").on("value",snap=>{
-      const v=snap.val()||{};
-      cloudUsers=Object.keys(v).map(k=>({user:k,...v[k]}));
-      if($("usersModal").classList.contains("on")) renderUsers();
-    });
-  }catch(e){ setPill("off","Local mode"); loadLocalSheets(); }
-}
-function loadLocalSheets(){
-  sheets=JSON.parse(localStorage.getItem(LS_SHEETS)||"[]");
-  renderFolders();
-}
-function persistLocal(){localStorage.setItem(LS_SHEETS,JSON.stringify(sheets));}
-function allUsers(){
-  const local=cloudOn?[]:JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
-  return USERS.concat(cloudUsers).concat(local);
-}
-
-/* ---------- auth ---------- */
-function doLogin(){
-  const u=$("u").value.trim(), p=$("p").value;
-  const hit=allUsers().find(x=>x.user.toLowerCase()===u.toLowerCase()&&x.pass===p);
-  if(!hit){$("loginErr").style.display="block";return;}
-  sessionStorage.setItem(LS_SESSION,JSON.stringify({user:hit.user,role:hit.role}));
-  enterApp();
-}
-function doLogout(){sessionStorage.removeItem(LS_SESSION);location.reload();}
-document.addEventListener("keydown",e=>{
-  if(e.key==="Enter" && $("loginView").style.display!=="none") doLogin();
-});
-
-function enterApp(){
-  const s=session(); if(!s) return;
-  $("loginView").style.display="none";
-  $("appView").classList.add("on");
-  $("whoName").textContent=s.user;
-  $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome, ${esc(s.user)}`;
-  $("whoRole").textContent=s.role;
-  $("avatar").textContent=s.user[0].toUpperCase();
-  const isAdmin=s.role==="admin";
-  $("usersBtn").style.display=isAdmin?"":"none";
-  $("addBtn").style.display=isAdmin?"":"none";
-  showWelcome(); renderFolders();
-}
-
-/* ---------- sheets ---------- */
-function extractId(url){const m=String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9\-_]+)/);return m?m[1]:null;}
-
-function addSheet(){
-  if(!isAdminNow()){toast("Only admins can add sheets");return;}
-  const name=$("sheetName").value.trim(), url=$("sheetUrl").value.trim();
-  const icon=$("sheetIcon").value.trim()||"📄";
-  if(!name){toast("Give the sheet a display name");return;}
-  const gid=extractId(url);
-  if(!gid){toast("That doesn't look like a Google Sheets link");return;}
-  if(cloudOn){
-    db.ref("sheets").push({name,gid,icon,ts:Date.now()})
-      .then(()=>toast("“"+name+"” added for everyone ✓"))
-      .catch(()=>toast("Cloud save failed — check internet"));
-  }else{
-    sheets.push({id:Date.now().toString(36),name,gid,icon});
-    persistLocal(); renderFolders();
-    toast("“"+name+"” added (this browser only — cloud not connected)");
-  }
-  closeModal("addModal");
-  $("sheetName").value=$("sheetUrl").value=$("sheetIcon").value="";
-}
-function delSheet(ev,id){
-  ev.stopPropagation();
-  if(!isAdminNow()){toast("Only admins can remove sheets");return;}
-  const s=sheets.find(x=>x.id===id); if(!s)return;
-  if(!confirm("Remove “"+s.name+"” from the dashboard? (The Google Sheet itself is not deleted.)"))return;
-  if(cloudOn){ db.ref("sheets/"+id).remove(); }
-  else{ sheets=sheets.filter(x=>x.id!==id); persistLocal(); renderFolders(); }
-  if(activeId===id){activeId=null;showWelcome();}
-}
-
-
-
-function editSheet(ev,id){
-  ev.stopPropagation();
-  if(!isAdminNow()){toast("Only admins can rename sheets");return;}
-  const s=sheets.find(x=>x.id===id); if(!s)return;
-  const newName=prompt("New name for this sheet:",s.name);
-  if(newName===null)return;                      // cancelled
-  const nm=newName.trim();
-  if(!nm){toast("Name can't be empty");return;}
-  if(cloudOn){
-    db.ref("sheets/"+id+"/name").set(nm).then(()=>toast("Renamed ✓"));
-  }else{
-    s.name=nm; persistLocal(); renderFolders(); toast("Renamed ✓");
-  }
-  if(activeId===id) $("stageTitle").innerHTML=`<span class="live-dot"></span>${esc(nm)}`;
-}
-function renderFolders(){
-  const list=$("folderList"); if(!list)return;
-  if(!sheets.length){
-    list.innerHTML='<div class="empty-hint">No sheets yet.<br>Tap the <b>+</b> above and paste a Google Sheet link to begin.</div>';
-    return;
-  }
-  list.innerHTML=sheets.map(s=>`
-    <div class="folder ${s.id===activeId?'active':''}" onclick="openSheet('${s.id}')">
-      <div class="folder-ico">${s.icon||"📄"}</div>
-      <div class="folder-meta"><b>${esc(s.name)}</b><small>Google Sheet</small></div>
-      ${isAdminNow()?`<button class="btn folder-edit" title="Rename" onclick="editSheet(event,'${s.id}')">✏️</button><button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
-    </div>`).join("");
-}
-function openSheet(id){
-  const s=sheets.find(x=>x.id===id); if(!s)return;
-  activeId=id; renderFolders(); toggleSide(false);
-  const gid=s.gid||extractId(s.url||"");
-  const embed=`https://docs.google.com/spreadsheets/d/${gid}/edit?rm=minimal&widget=true&chrome=false`;
-  $("stage").innerHTML=`<div class="sheet-frame-wrap"><iframe src="${embed}" allow="clipboard-read; clipboard-write"></iframe></div>`;
-  $("stageTitle").innerHTML=`<span class="live-dot"></span>${esc(s.name)}`;
-  const ext=$("openExt"); ext.style.display=""; ext.href=`https://docs.google.com/spreadsheets/d/${gid}/edit`;
-}
-function showWelcome(){
-  const s=session();
-  // $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome${s?", "+esc(s.user):""}`;
-  $("stageTitle").innerHTML=`<span class="live-dot"></span>Welcome${s?", "+esc(s.user[0].toUpperCase()+s.user.slice(1)):""}`;
-  $("openExt").style.display="none";
-  $("stage").innerHTML=`
-    <div class="welcome">
-      <div class="crest"><img src="logo.png" alt="ODEA"></div>
-      <h2>Your sheets, one <em>royal</em> desk.</h2>
-      <p>Pick a folder from the left to open it here — every inner sheet tab stays fully editable. Sheets added by an admin appear for everyone, on every device.</p>
-    </div>`;
-}
-
-/* ---------- users (admin) ---------- */
-function openUsers(){renderUsers();openModal("usersModal");}
-function renderUsers(){
-  const rows=$("userRows");
-  const perm=USERS.map(u=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · master</small></div></div>`).join("");
-  const cloud=cloudUsers.map(u=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px;background:linear-gradient(135deg,#7A5CE0,#E8B44A)">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · cloud</small></div><button class="btn tiny-del" onclick="delCloudUser('${esc(u.user)}')">✕</button></div>`).join("");
-  const local=cloudOn?"":JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]").map((u,i)=>`<div class="user-row"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.user[0].toUpperCase()}</div><div class="who"><b>${esc(u.user)}</b><small>${u.role} · this browser</small></div><button class="btn tiny-del" onclick="delLocalUser(${i})">✕</button></div>`).join("");
-  rows.innerHTML=perm+cloud+local;
-}
-function addUser(){
-  if(!isAdminNow()){toast("Only admins can create users");return;}
-  const name=$("nuName").value.trim(), pass=$("nuPass").value, role=$("nuRole").value;
-  if(!name||!pass){toast("Username and password required");return;}
-  if(/[.#$\[\]\/]/.test(name)){toast("Username can't contain . # $ [ ] /");return;}
-  if(allUsers().some(u=>u.user.toLowerCase()===name.toLowerCase())){toast("That username already exists");return;}
-  if(cloudOn){
-    db.ref("users/"+name).set({pass,role})
-      .then(()=>{toast("User “"+name+"” created — can sign in anywhere ✓");})
-      .catch(()=>toast("Cloud save failed"));
-  }else{
-    const arr=JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
-    arr.push({user:name,pass,role});
-    localStorage.setItem(LS_LOCALUSERS,JSON.stringify(arr));
-    toast("User created (this browser only — cloud not connected)");
-    renderUsers();
-  }
-  $("nuName").value=$("nuPass").value="";
-}
-function delCloudUser(name){
-  if(!isAdminNow())return;
-  if(!confirm("Delete user “"+name+"”?"))return;
-  db.ref("users/"+name).remove();
-}
-function delLocalUser(i){
-  const arr=JSON.parse(localStorage.getItem(LS_LOCALUSERS)||"[]");
-  if(!confirm("Delete user “"+arr[i].user+"”?"))return;
-  arr.splice(i,1); localStorage.setItem(LS_LOCALUSERS,JSON.stringify(arr)); renderUsers();
-}
-
-/* ---------- mobile sidebar ---------- */
-function toggleSide(force){
-  const sb=$("sidebar"), sc=$("scrim");
-  const on=force!==undefined?force:!sb.classList.contains("open");
-  sb.classList.toggle("open",on); sc.classList.toggle("on",on);
-}
-
-
-function smartToggle(){
-  if(window.innerWidth>860){ $("sidebar").classList.toggle("closed"); }
-  else{ toggleSide(); }
-}
-
-/* ---------- boot ---------- */
-bootCloud();
-if(session()) enterApp();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
