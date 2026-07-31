@@ -536,6 +536,16 @@ let db=null, cloudOn=false;
 let sheets=[], cloudUsers=[], teams=[], entries=[], tasks=[], settings={};
 let activeId=null, editingSheetId=null, editingUserKey=null, currentView="welcome";
 let folders=[], editingFolderId=null, openFolders=JSON.parse(localStorage.getItem("odea_openfolders")||"{}");
+let pins={};
+function pinKey(){return "pins/"+(me().user||"anon");}
+function isPinned(id){return !!pins[id];}
+function togglePin(ev,id){
+  ev.stopPropagation();
+  if(!cloudOn)return;
+  const on=!pins[id];
+  db.ref(pinKey()+"/"+id).set(on?true:null);
+  toast(on?"Pinned to top ✓":"Unpinned");
+}
 
 /* ---------- tiny helpers ---------- */
 const $=id=>document.getElementById(id);
@@ -599,6 +609,8 @@ function bootCloud(){
       refreshMyChip(); if(currentView==="board")renderBoard();
       if($("usersModal").classList.contains("on"))renderUsers();
       if($("profileModal").classList.contains("on"))$("pfPreview").innerHTML=avatarHTML(me().user,72);});
+    db.ref("pins").on("value",s=>{const v=s.val()||{};
+      pins=(v[me().user||"anon"])||{}; renderFolders();});
     db.ref("folders").on("value",s=>{const v=s.val()||{};
       folders=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>((a.order??a.ts??0)-(b.order??b.ts??0)));
       renderFolders(); renderFolderSelect();});
@@ -847,10 +859,15 @@ function renderFolders(){
     <div class="folder subsheet ${s.id===activeId?"active":""}" data-id="${s.id}" onclick="openSheet('${s.id}')">
       <div class="folder-ico">${s.icon||"📄"}</div>
       <div class="folder-meta"><b>${esc(s.name)}</b><small>${s.teams&&!s.teams.All?esc(Object.keys(s.teams).join(", ")):"All teams"}</small></div>
+      <button class="btn folder-edit pin-btn ${isPinned(s.id)?"on":""}" title="${isPinned(s.id)?"Unpin":"Pin to top"}" onclick="togglePin(event,'${s.id}')">${isPinned(s.id)?"★":"☆"}</button>
       ${admin?`<button class="btn folder-edit" title="Edit" onclick="editSheet(event,'${s.id}')">✏️</button><button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
     </div>`;
 
   let html="";
+  const pinned=vis.filter(s=>isPinned(s.id));
+  if(pinned.length){
+    html+=`<div class="pin-head">📌 Pinned</div>`+pinned.map(row).join("")+`<div class="pin-sep"></div>`;
+  }
   if(settings.archiveUrl&&admin){
     const agid=extractId(settings.archiveUrl);
     if(agid)html+=`<div class="folder ${activeId==="__archive"?"active":""}" onclick="openArchive()">

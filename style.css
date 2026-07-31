@@ -322,3 +322,9 @@ body.light .overlay{background:rgba(80,60,40,.35)}
 .grp-body{display:none;padding-left:14px;border-left:2px solid rgba(241,90,34,.28);margin:4px 0 4px 16px}
 .grp-body.on{display:block;animation:rise .25s ease both}
 .subsheet{margin-bottom:4px}
+
+.pin-btn{opacity:1!important;color:var(--cream-dim);font-size:14px}
+.pin-btn.on{color:var(--gold)}
+.pin-btn:hover{background:rgba(232,180,74,.25);color:#fff}
+.pin-head{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);padding:4px 12px 6px}
+.pin-sep{height:1px;background:var(--glass-border);margin:8px 12px 10px}
