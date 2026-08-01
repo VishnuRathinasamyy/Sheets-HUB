@@ -42,7 +42,16 @@ function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");clear
 function openModal(id){$(id).classList.add("on")}
 function closeModal(id){$(id).classList.remove("on")}
 function esc(t){return String(t??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function session(){try{return JSON.parse(sessionStorage.getItem(LS_SESSION))}catch(e){return null}}
+function session(){
+  try{
+    let s=sessionStorage.getItem(LS_SESSION);
+    if(!s){                                   // new tab? inherit the login
+      const b=localStorage.getItem(LS_SESSION);
+      if(b){sessionStorage.setItem(LS_SESSION,b);s=b;}
+    }
+    return JSON.parse(s);
+  }catch(e){return null}
+}
 function me(){return session()||{};}
 function isAdminNow(){return me().role==="admin";}
 function isCoordinator(){return me().role==="coordinator";}
@@ -135,10 +144,11 @@ function doLogin(){
   const u=$("u").value.trim(),p=$("p").value;
   const hit=allUsers().find(x=>x.user.toLowerCase()===u.toLowerCase()&&x.pass===p);
   if(!hit){$("loginErr").style.display="block";return;}
-  sessionStorage.setItem(LS_SESSION,JSON.stringify({user:hit.user,role:hit.role,team:hit.team||"",name:hit.name||cap(hit.user)}));
+  const sess=JSON.stringify({user:hit.user,role:hit.role,team:hit.team||"",name:hit.name||cap(hit.user)});
+  sessionStorage.setItem(LS_SESSION,sess); localStorage.setItem(LS_SESSION,sess);
   enterApp();
 }
-function doLogout(){sessionStorage.removeItem(LS_SESSION);location.reload();}
+function doLogout(){sessionStorage.removeItem(LS_SESSION);localStorage.removeItem(LS_SESSION);location.reload();}
 document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&$("loginView").style.display!=="none"&&!$("appView").classList.contains("on"))doLogin();
 });
@@ -166,6 +176,8 @@ function enterApp(){
   $("newFolderBtn")&&($("newFolderBtn").style.display=a?"":"none");
   $("boardBtn")&&($("boardBtn").style.display=co?"none":"");
   showWelcome(); renderFolders(); updateTaskBadge();
+  const want=new URLSearchParams(location.search).get("sheet");
+  if(want) setTimeout(()=>openSheet(want),600);   // deep link from a new tab
   if(co)openTasks();   // coordinators land straight in their one job
 }
 
@@ -346,7 +358,7 @@ function renderFolders(){
   const vis=visAll.filter(s=>!isPinned(s.id));
   const admin=isAdminNow();
   const row=s=>`
-    <div class="folder subsheet ${s.id===activeId?"active":""}" data-id="${s.id}" onclick="openSheet('${s.id}')">
+    <div class="folder subsheet ${s.id===activeId?"active":""}" data-id="${s.id}" onclick="openSheet('${s.id}')" oncontextmenu="showCtx(event,'${s.id}')">
       <div class="folder-ico">${s.icon||"📄"}</div>
       <div class="folder-meta"><b>${esc(s.name)}</b><small>${s.teams&&!s.teams.All?esc(Object.keys(s.teams).join(", ")):"All teams"}</small></div>
       <button class="btn folder-edit pin-btn ${isPinned(s.id)?"on":""}" title="${isPinned(s.id)?"Unpin":"Pin to top"}" onclick="togglePin(event,'${s.id}')">${isPinned(s.id)?"★":"☆"}</button>
@@ -771,3 +783,25 @@ function askConfirm(title,msg,onYes,yesLabel){
   fresh.addEventListener("click",()=>{closeModal("confirmModal");onYes();});
   openModal("confirmModal");
 }
+
+
+/* ---------- right-click: open sheet in a new dashboard tab ---------- */
+function openInNewTab(id){
+  hideCtx();
+  window.open(location.pathname+"?sheet="+encodeURIComponent(id),"_blank");
+}
+function showCtx(ev,id){
+  ev.preventDefault(); ev.stopPropagation();
+  hideCtx();
+  const m=document.createElement("div");
+  m.className="ctx-menu"; m.id="ctxMenu";
+  m.innerHTML=`<button onclick="openInNewTab('${id}')">🗗 Open in new tab</button>
+               <button onclick="openSheet('${id}');hideCtx()">↳ Open here</button>`;
+  document.body.appendChild(m);
+  const w=210,h=90;
+  m.style.left=Math.min(ev.clientX,window.innerWidth-w-8)+"px";
+  m.style.top=Math.min(ev.clientY,window.innerHeight-h-8)+"px";
+}
+function hideCtx(){const m=$("ctxMenu");if(m)m.remove();}
+document.addEventListener("click",hideCtx);
+document.addEventListener("scroll",hideCtx,true);
