@@ -402,3 +402,9 @@ body.light .overlay{background:rgba(80,60,40,.35)}
 .shard.s5{--dx:75px;--dy:70px;--rot:48deg}
 .shard.s6{--dx:95px;--dy:35px;--rot:66deg}
 @media (max-width:600px){.task-alert{top:70px;right:12px;left:12px}.ta-glass{min-width:0}}
+
+/* user can edit the todo untill 5pm */
+.entry-edit{width:24px;height:24px;border-radius:8px;background:transparent;border:none;cursor:pointer;
+  color:var(--cream-dim);font-size:12px;flex-shrink:0;opacity:0;transition:.2s}
+.entry:hover .entry-edit{opacity:1}
+.entry-edit:hover{background:rgba(232,180,74,.25);color:#fff}

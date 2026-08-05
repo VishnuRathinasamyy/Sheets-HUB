@@ -483,7 +483,7 @@ function renderBoard(){
       <div class="entry">
         <span class="status-chip ${e.status||"pending"}${(e.user===mine||isAdminNow())?"":" locked-chip"}" title="${(e.user===mine||isAdminNow())?"Tap to change status":"Only "+esc(u.name||u.user)+" can change this"}" ${(e.user===mine||isAdminNow())?`onclick="cycleStatus('${e.id}')"`:""}></span>
         <div class="txt ${e.status==="done"?"done":""}">${esc(e.text)}${(e.days||1)>1?` <small style="color:var(--gold)">(Day ${e.days})</small>`:""}</div>
-        ${canDeleteEntry(e)?`<button class="btn entry-del" onclick="delEntry('${e.id}')">✕</button>`:""}
+        ${canDeleteEntry(e)?`<button class="btn entry-edit" title="Edit" onclick="editEntry('${e.id}')">✏️</button><button class="btn entry-del" onclick="delEntry('${e.id}')">✕</button>`:""}
       </div>`;
     return `
     <div class="member-card ${u.user===mine?"me":""}" data-id="${esc(u.user)}">
@@ -538,6 +538,15 @@ function delEntry(id){
   const e=entries.find(x=>x.id===id);if(!e)return;
   if(!canDeleteEntry(e)){toast((e.days||1)>1?"Carried tasks: admin only":"Locked after 5 PM");return;}
   db.ref("entries/"+id).remove();
+}
+function editEntry(id){
+  const e=entries.find(x=>x.id===id);if(!e)return;
+  if(!canDeleteEntry(e)){toast((e.days||1)>1?"Carried tasks can't be edited":"Editing locked after 5 PM");return;}
+  const t=prompt("Edit this To-Do / EOD:",e.text);
+  if(t===null)return;
+  const txt=t.trim();
+  if(!txt){toast("Text can't be empty");return;}
+  db.ref("entries/"+id+"/text").set(txt).then(()=>toast("Updated ✓"));
 }
 
 /* ---------- USERS ---------- */
