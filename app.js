@@ -668,10 +668,37 @@ function myOpenTasks(){
   const m=me();
   return tasks.filter(t=>t.status==="open"&&t.to&&((t.to.users&&t.to.users[m.user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
 }
+let _seenTasks=null;
 function updateTaskBadge(){
-  const n=myOpenTasks().length;
+  const open=myOpenTasks();
+  const n=open.length;
   const b=$("taskBadge");if(!b)return;
   b.style.display=n?"flex":"none";b.textContent=n;
+  // announce new arrivals (skip the very first load right after login)
+  const ids=open.map(t=>t.id).sort().join(",");
+  if(_seenTasks===null){ _seenTasks=ids; if(n)taskAlert(n,true); return; }
+  if(ids!==_seenTasks){
+    const fresh=open.filter(t=>!_seenTasks.includes(t.id));
+    if(fresh.length)taskAlert(fresh.length,false);
+    _seenTasks=ids;
+  }
+}
+function taskAlert(n,onLogin){
+  const old=$("taskAlert"); if(old)old.remove();
+  const el=document.createElement("div");
+  el.id="taskAlert"; el.className="task-alert";
+  el.innerHTML=`
+    <div class="ta-glass">
+      <div class="ta-ico">🔔</div>
+      <div class="ta-txt"><b>${onLogin?"You have":"New"} ${n} task${n>1?"s":""}</b>
+      <small>Tap the Tasks button to view</small></div>
+    </div>
+    <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div>
+    <div class="shard s4"></div><div class="shard s5"></div><div class="shard s6"></div>`;
+  el.onclick=()=>{el.remove();openTasks();};
+  document.body.appendChild(el);
+  setTimeout(()=>el.classList.add("shatter"),4200);
+  setTimeout(()=>el.remove(),5400);
 }
 function openTasks(){renderTasks();openModal("tasksModal");}
 function relevantTasks(){
@@ -687,13 +714,34 @@ function renderTasks(){
   $("taskRows").innerHTML=relevantTasks().map(t=>{
     const who=[...(t.to?.teams?Object.keys(t.to.teams):[]),...(t.to?.users?Object.keys(t.to.users).map(displayName):[])].join(", ");
     const canDel=admin||t.by===me().user;
+    const notedBy=t.noted?Object.keys(t.noted):[];
+    const iNoted=notedBy.includes(me().user);
+    const isForMe=!!(t.to&&((t.to.users&&t.to.users[me().user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
+    const reps=t.replies?Object.keys(t.replies).map(k=>({id:k,...t.replies[k]})).sort((a,b)=>a.ts-b.ts):[];
     return `<div class="task-card ${t.status==="open"?"open":"done-t"}">
       <div class="task-top"><b>${esc(t.title)}</b></div>
       <div class="task-meta">To: ${esc(who)} · By ${esc(displayName(t.by))} · ${new Date(t.ts).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
       <div class="task-body">${sanitize(t.body||"")}</div>
       <div class="task-actions">
         ${t.status==="open"?`<button class="btn chip-btn ok" onclick="doneTask('${t.id}')">✓ Mark done</button>`:`<span class="chip-btn ok" style="cursor:default">Completed</span>`}
+        ${isForMe?(iNoted?`<span class="chip-btn noted-on" style="cursor:default">👁 Noted</span>`
+                        :`<button class="btn chip-btn" onclick="noteTask('${t.id}')">👁 Noted</button>`):""}
+        <button class="btn chip-btn" onclick="toggleReply('${t.id}')">💬 Reply${reps.length?" ("+reps.length+")":""}</button>
         ${canDel?`<button class="btn chip-btn" onclick="delTask('${t.id}')">Delete</button>`:""}
+      </div>
+      ${notedBy.length?`<div class="noted-strip">${notedBy.map(n=>`<span class="noted-badge">👁 ${esc(displayName(n))} noted</span>`).join("")}</div>`:""}
+      <div class="reply-box" id="rb_${t.id}">
+        ${reps.map(r=>`
+          <div class="reply ${r.by===me().user?"mine":""}">
+            <b>${esc(displayName(r.by))}</b>
+            <span>${esc(r.text)}</span>
+            <small>${new Date(r.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</small>
+            ${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn danger" onclick="delReply('${t.id}','${r.id}','${r.by}')">✕</button>`:""}
+          </div>`).join("")}
+        <div class="reply-row">
+          <input id="rp_${t.id}" placeholder="Write a reply…" onkeydown="if(event.key==='Enter')sendReply('${t.id}')">
+          <button class="btn mini-add todo" onclick="sendReply('${t.id}')">SEND</button>
+        </div>
       </div>
     </div>`;
   }).join("")||'<div class="mc-empty" style="padding:10px">No tasks here yet 🎉</div>';
@@ -720,6 +768,28 @@ function assignTask(){
   closeModal("composeModal");
 }
 function doneTask(id){db.ref("tasks/"+id+"/status").set("done");}
+
+/* ---------- NOTED ---------- */
+function noteTask(id){
+  const m=me().user;
+  db.ref("tasks/"+id+"/noted/"+m).set({at:Date.now()}).then(()=>toast("Marked as noted ✓"));
+}
+/* ---------- REPLIES ---------- */
+function sendReply(id){
+  const box=$("rp_"+id); if(!box)return;
+  const txt=box.value.trim(); if(!txt){toast("Write a reply first");return;}
+  db.ref("tasks/"+id+"/replies").push({by:me().user,text:txt,ts:Date.now()})
+    .then(()=>{box.value="";});
+}
+function toggleReply(id){
+  const b=$("rb_"+id); if(!b)return;
+  b.classList.toggle("on");
+  if(b.classList.contains("on")){const i=$("rp_"+id); i&&i.focus();}
+}
+function delReply(tid,rid,by){
+  if(!isAdminNow()&&by!==me().user)return;
+  db.ref("tasks/"+tid+"/replies/"+rid).remove();
+}
 function delTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   if(!isAdminNow()&&t.by!==me().user)return;
