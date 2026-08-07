@@ -25,6 +25,9 @@ let db=null, cloudOn=false;
 let sheets=[], cloudUsers=[], teams=[], entries=[], tasks=[], settings={};
 let activeId=null, editingSheetId=null, editingUserKey=null, currentView="welcome";
 let folders=[], editingFolderId=null, openFolders=JSON.parse(localStorage.getItem("odea_openfolders")||"{}");
+let approvals=[], apprFilter="all";
+let archTab="appr", archSort={col:"created",dir:-1};
+const HIDE_AFTER=12*60*60*1000;   // approved/completed items vanish after 12 hours
 let pins={};
 function pinKey(){return "pins/"+(me().user||"anon");}
 function isPinned(id){return !!pins[id];}
@@ -123,6 +126,10 @@ function bootCloud(){
       tasks=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
       updateTaskBadge();
       if($("tasksModal").classList.contains("on"))renderTasks();});
+    db.ref("approvals").on("value",s=>{const v=s.val()||{};
+      approvals=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+      updateApprBadge(); notifyCheck();
+      if($("apprModal").classList.contains("on"))renderApprovals();});
     db.ref("settings").on("value",s=>{settings=s.val()||{};
       if($("settingsModal").classList.contains("on"))$("archiveUrl").value=settings.archiveUrl||"";
       renderFolders();});
@@ -135,6 +142,7 @@ function allUsers(){return USERS.concat(cloudUsers);}
 
 function forceLogout(){
   sessionStorage.removeItem(LS_SESSION);
+  localStorage.removeItem(LS_SESSION);
   alert("Your access has been removed by an administrator.");
   location.reload();
 }
@@ -175,7 +183,10 @@ function enterApp(){
   $("addBtn").style.display=a?"":"none";
   $("newFolderBtn")&&($("newFolderBtn").style.display=a?"":"none");
   $("boardBtn")&&($("boardBtn").style.display=co?"none":"");
+  $("apprBtn")&&($("apprBtn").style.display=co?"none":"");
+  $("archBtn")&&($("archBtn").style.display=co?"none":"");
   showWelcome(); renderFolders(); updateTaskBadge();
+  askNotifyPermission();
   const want=new URLSearchParams(location.search).get("sheet");
   if(want) setTimeout(()=>openSheet(want),600);   // deep link from a new tab
   if(co)openTasks();   // coordinators land straight in their one job
@@ -677,34 +688,165 @@ function myOpenTasks(){
   const m=me();
   return tasks.filter(t=>t.status==="open"&&t.to&&((t.to.users&&t.to.users[m.user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
 }
-let _seenTasks=null;
+/* ================= NOTIFICATION ENGINE ================= */
+let _notifyReady=false;
+function seenKey(){return "odea_seen_"+(me().user||"anon");}
+function getSeen(){try{return JSON.parse(localStorage.getItem(seenKey())||"{}")}catch(e){return {}}}
+function markSeen(o){localStorage.setItem(seenKey(),JSON.stringify(o));}
+
 function updateTaskBadge(){
   const open=myOpenTasks();
-  const n=open.length;
-  const b=$("taskBadge");if(!b)return;
-  b.style.display=n?"flex":"none";b.textContent=n;
-  // announce new arrivals (skip the very first load right after login)
-  const ids=open.map(t=>t.id).sort().join(",");
-  if(_seenTasks===null){ _seenTasks=ids; if(n)taskAlert(n,true); return; }
-  if(ids!==_seenTasks){
-    const fresh=open.filter(t=>!_seenTasks.includes(t.id));
-    if(fresh.length)taskAlert(fresh.length,false);
-    _seenTasks=ids;
+  const b=$("taskBadge");if(b){b.style.display=open.length?"flex":"none";b.textContent=open.length;}
+  updateApprBadge&&updateApprBadge();
+  notifyCheck();
+}
+function myOpenTasksLive(){
+  const cut=Date.now()-HIDE_AFTER;
+  const m=me();
+  return tasks.filter(t=>(t.status==="open"||(t.doneAt||0)>cut)&&t.to&&
+    ((t.to.users&&t.to.users[m.user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
+}
+function notifyCheck(){
+  const m=me().user; if(!m) return;
+  const seen=getSeen(), fresh=[];
+  const add=(k,kind,text,sub,from)=>{ if(!seen[k]){ seen[k]=1; fresh.push({kind,text,sub,from,uid:k}); } };
+
+  myOpenTasks().forEach(t=>add("t_"+t.id,"task","New task",t.title,t.by));
+  pendingForMe().forEach(a=>add("a_"+a.id,"approval","Approval needed",a.title,a.by));
+  approvals.filter(a=>a.by===m&&a.status==="approved")
+    .forEach(a=>add("ad_"+a.id,"approved","Approved",a.title,a.decidedBy));
+  approvals.filter(a=>a.by===m&&a.status==="rejected")
+    .forEach(a=>add("ar_"+a.id,"rejected","Needs correction",a.title,a.decidedBy));
+  approvals.forEach(a=>{ if(!(a.by===m||isApprover(a)))return;
+    Object.keys(a.replies||{}).forEach(rid=>{ const r=a.replies[rid];
+      if(r.by!==m) add("rp_"+rid,"reply","New reply",displayName(r.by)+" · "+a.title,r.by); }); });
+  tasks.forEach(t=>{ const forMe=t.to&&((t.to.users&&t.to.users[m])||(t.to.teams&&myTeams().some(x=>t.to.teams[x])));
+    if(!(t.by===m||forMe))return;
+    Object.keys(t.replies||{}).forEach(rid=>{ const r=t.replies[rid];
+      if(r.by!==m) add("rt_"+rid,"reply","New reply",displayName(r.by)+" · "+t.title,r.by); }); });
+  tasks.filter(t=>t.by===m&&t.noted).forEach(t=>Object.keys(t.noted).forEach(u=>{
+    if(u!==m) add("nt_"+t.id+u,"noted","Noted",displayName(u)+" · "+t.title,u); }));
+  tasks.filter(t=>t.by===m&&t.status==="done").forEach(t=>
+    add("td_"+t.id,"approved","Task completed ✓",t.title));
+  approvals.filter(a=>isApprover(a)&&a.status!=="pending").forEach(a=>
+    add("ax_"+a.id,a.status==="approved"?"approved":"rejected",
+        a.status==="approved"?"You approved ✓":"Sent back ✎",a.title));
+
+  markSeen(seen);
+  if(!_notifyReady){ _notifyReady=true; digestAlert(); return; }
+  fresh.slice(0,3).forEach((f,i)=>setTimeout(()=>popAlert(f.kind,f.text,f.sub,f.from,f.uid),i*450));
+}
+
+/* Build the full list of things this person should be told about */
+function activeAlerts(){
+  const m=me().user; if(!m) return [];
+  const cut=Date.now()-HIDE_AFTER, out=[];
+  myOpenTasks().forEach(t=>out.push({kind:"task",text:"Task",sub:t.title,ts:t.ts||0,from:t.by}));
+  pendingForMe().forEach(a=>out.push({kind:"approval",text:"Approval needed",sub:a.title,ts:a.ts||0,from:a.by}));
+  approvals.filter(a=>a.by===m&&a.status==="approved"&&(a.decidedAt||0)>cut)
+    .forEach(a=>out.push({kind:"approved",text:"Approved",sub:a.title,ts:a.decidedAt,from:a.decidedBy}));
+  approvals.filter(a=>a.by===m&&a.status==="rejected"&&(a.decidedAt||0)>cut)
+    .forEach(a=>out.push({kind:"rejected",text:"Needs correction",sub:a.title,ts:a.decidedAt,from:a.decidedBy}));
+  tasks.filter(t=>t.by===m&&t.status==="done"&&(t.doneAt||0)>cut)
+    .forEach(t=>out.push({kind:"approved",text:"Task completed",sub:t.title,ts:t.doneAt}));
+  tasks.filter(t=>t.by===m&&t.noted&&t.status==="open").forEach(t=>Object.keys(t.noted).forEach(u=>{
+    if(u!==m)out.push({kind:"noted",text:"Noted",sub:displayName(u)+" · "+t.title,ts:t.noted[u].at||0,from:u});}));
+  const recent=Date.now()-24*60*60*1000;              // replies from the last 24h
+  approvals.forEach(a=>{ if(!(a.by===m||isApprover(a)))return;
+    const rs=Object.values(a.replies||{}).filter(r=>r.by!==m&&r.ts>recent);
+    if(!rs.length)return;
+    const last=rs.sort((x,y)=>y.ts-x.ts)[0];
+    out.push({kind:"reply",text:rs.length>1?rs.length+" new replies":"Reply",
+              sub:displayName(last.by)+" · "+a.title,ts:last.ts,from:last.by});});
+  tasks.forEach(t=>{const forMe=t.to&&((t.to.users&&t.to.users[m])||(t.to.teams&&myTeams().some(x=>t.to.teams[x])));
+    if(!(t.by===m||forMe))return;
+    const rs=Object.values(t.replies||{}).filter(r=>r.by!==m&&r.ts>recent);
+    if(!rs.length)return;
+    const last=rs.sort((x,y)=>y.ts-x.ts)[0];
+    out.push({kind:"reply",text:rs.length>1?rs.length+" new replies":"Reply",
+              sub:displayName(last.by)+" · "+t.title,ts:last.ts,from:last.by});});
+  return out.sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+/* Show them all, one after another */
+function digestAlert(){
+  if(!session())return;
+  const list=activeAlerts();
+  if(!list.length)return;
+  document.querySelectorAll(".task-alert").forEach(e=>e.remove());
+  list.slice(0,8).forEach((f,i)=>setTimeout(()=>popAlert(f.kind,f.text,f.sub,f.from,"__digest"),i*900));
+}
+let _leftAt=0;
+const AWAY_MIN=2*60*1000;          // must be away 2 minutes to get the digest
+// const AWAY_MIN=10*1000;   // 10 seconds, for testing
+function markAway(){ _leftAt=Date.now(); }
+function maybeDigest(){
+  if(!session())return;
+  if(!_leftAt)return;                        // never left — nothing to catch up on
+  const away=Date.now()-_leftAt;
+  _leftAt=0;
+  if(away<AWAY_MIN)return;                   // quick tab flick — stay quiet
+  digestAlert();
+}
+document.addEventListener("visibilitychange",()=>{
+  document.hidden ? markAway() : maybeDigest();
+});
+window.addEventListener("blur",markAway);
+window.addEventListener("focus",maybeDigest);
+/* ---------- native browser notifications ---------- */
+function askNotifyPermission(){
+  if(!("Notification" in window))return;
+  if(Notification.permission==="default"){
+    setTimeout(()=>Notification.requestPermission(),1500);
   }
 }
-function taskAlert(n,onLogin){
-  const old=$("taskAlert"); if(old)old.remove();
+function nativeKey(){return "odea_native_"+(me().user||"anon");}
+function nativeSent(){try{return JSON.parse(localStorage.getItem(nativeKey())||"{}")}catch(e){return {}}}
+function nativeNotify(title,body,kind,photo,id){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  if(!document.hidden)return;                 // on screen? the glass popup handles it
+  const key=id||(kind+"|"+title+"|"+(body||""));
+  const sent=nativeSent();
+  if(sent[key])return;                        // already notified — ever
+  sent[key]=Date.now();
+  // keep the list tidy: drop entries older than 30 days
+  const cutoff=Date.now()-30*24*60*60*1000;
+  Object.keys(sent).forEach(k=>{ if(sent[k]<cutoff) delete sent[k]; });
+  localStorage.setItem(nativeKey(),JSON.stringify(sent));
+  try{
+    const n=new Notification("ODEA Sheets HUB — "+title,{
+      body:body||"",
+      icon:photo||"Sheets HUB logo.webp",
+      badge:"sheets HUB logo.webp",
+      tag:key
+    });
+    n.onclick=()=>{window.focus();n.close();};
+    setTimeout(()=>n.close(),8000);
+  }catch(e){}
+}
+
+const ALERT_STYLE={
+  task:{ico:"🔔",cls:"n-task"}, approval:{ico:"✅",cls:"n-appr"},
+  approved:{ico:"🎉",cls:"n-ok"}, rejected:{ico:"✎",cls:"n-bad"},
+  reply:{ico:"💬",cls:"n-reply"}, noted:{ico:"👁",cls:"n-noted"},
+  welcome:{ico:"👋",cls:"n-task"}
+};
+function popAlert(kind,text,sub,fromUser,uid){
+  const photo=fromUser?userRec(fromUser).photo:null;
+  nativeNotify(text,sub,kind,photo,uid);
+  const s=ALERT_STYLE[kind]||ALERT_STYLE.task;
   const el=document.createElement("div");
-  el.id="taskAlert"; el.className="task-alert";
+  el.className="task-alert "+s.cls;
+  el.style.top=(80+document.querySelectorAll(".task-alert").length*92)+"px";
+  const face=photo?`<img class="ta-face" src="${photo}" alt="">`
+                  :(fromUser?`<div class="ta-face letter">${esc((displayName(fromUser)||"?")[0].toUpperCase())}</div>`:"");
   el.innerHTML=`
     <div class="ta-glass">
-      <div class="ta-ico">🔔</div>
-      <div class="ta-txt"><b>${onLogin?"You have":"New"} ${n} task${n>1?"s":""}</b>
-      <small>Tap the Tasks button to view</small></div>
+      ${face||`<div class="ta-ico">${s.ico}</div>`}
+      <div class="ta-txt"><b>${esc(text)} ${s.ico}</b><small>${esc(sub||"")}</small></div>
     </div>
     <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div>
     <div class="shard s4"></div><div class="shard s5"></div><div class="shard s6"></div>`;
-  el.onclick=()=>{el.remove();openTasks();};
+  el.onclick=()=>{el.remove(); (kind==="approval"||kind==="approved"||kind==="rejected")?openApprovals():openTasks();};
   document.body.appendChild(el);
   setTimeout(()=>el.classList.add("shatter"),4200);
   setTimeout(()=>el.remove(),5400);
@@ -720,7 +862,8 @@ function relevantTasks(){
 function renderTasks(){
   const admin=isAdminNow();
   $("tasksSub").textContent=admin?"All tasks across the team.":"Tasks assigned to you, and tasks you assigned.";
-  $("taskRows").innerHTML=relevantTasks().map(t=>{
+  const cut=Date.now()-HIDE_AFTER;
+  $("taskRows").innerHTML=relevantTasks().filter(t=>t.status==="open"||(t.doneAt||0)>cut).map(t=>{
     const who=[...(t.to?.teams?Object.keys(t.to.teams):[]),...(t.to?.users?Object.keys(t.to.users).map(displayName):[])].join(", ");
     const canDel=admin||t.by===me().user;
     const notedBy=t.noted?Object.keys(t.noted):[];
@@ -745,7 +888,8 @@ function renderTasks(){
             <b>${esc(displayName(r.by))}</b>
             <span>${esc(r.text)}</span>
             <small>${new Date(r.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</small>
-            ${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn danger" onclick="delReply('${t.id}','${r.id}','${r.by}')">✕</button>`:""}
+            ${r.edited?`<small style="opacity:.6">(edited)</small>`:""}
+            ${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn" title="Edit" onclick="editReply('task','${t.id}','${r.id}','${r.by}')">✏️</button><button class="btn tiny-btn danger" onclick="delReply('${t.id}','${r.id}','${r.by}')">✕</button>`:""}
           </div>`).join("")}
         <div class="reply-row">
           <input id="rp_${t.id}" placeholder="Write a reply…" onkeydown="if(event.key==='Enter')sendReply('${t.id}')">
@@ -776,7 +920,130 @@ function assignTask(){
     .then(()=>toast("Task assigned ✓"));
   closeModal("composeModal");
 }
-function doneTask(id){db.ref("tasks/"+id+"/status").set("done");}
+function doneTask(id){db.ref("tasks/"+id).update({status:"done",doneAt:Date.now()});}
+
+/* ================= APPROVALS ================= */
+function isApprover(a){
+  const m=me();
+  return !!(a.to&&((a.to.users&&a.to.users[m.user])||(a.to.teams&&myTeams().some(x=>a.to.teams[x]))));
+}
+function liveApprovals(){
+  const cut=Date.now()-HIDE_AFTER;
+  return approvals.filter(a=>a.status==="pending"||(a.decidedAt||0)>cut);
+}
+function myApprovals(){
+  const m=me().user;
+  return liveApprovals().filter(a=>isAdminNow()||a.by===m||isApprover(a));
+}
+function pendingForMe(){return liveApprovals().filter(a=>a.status==="pending"&&isApprover(a));}
+function updateApprBadge(){
+  const b=$("apprBadge");if(!b)return;
+  const n=pendingForMe().length;
+  b.style.display=n?"flex":"none";b.textContent=n;
+}
+function openApprovals(){renderApprovals();openModal("apprModal");}
+function setApprFilter(f){
+  apprFilter=f;
+  document.querySelectorAll(".af").forEach(b=>b.classList.toggle("on",b.dataset.f===f));
+  renderApprovals();
+}
+function openApprCompose(){
+  $("apprTitle").value="";$("apprLink").value="";$("apprBody").innerHTML="";$("apprPriority").value="normal";
+  $("apprChecks").innerHTML=teamNames().map(n=>`<label class="check-pill"><input type="checkbox" data-kind="team" value="${esc(n)}"> 👥 ${esc(n)}</label>`).join("")+
+    allUsers().filter(u=>u.user!==me().user).map(u=>`<label class="check-pill"><input type="checkbox" data-kind="user" value="${esc(u.user)}"> ${esc(u.name||cap(u.user))}</label>`).join("");
+  openModal("apprCompose");
+}
+function afmt(c){document.execCommand(c,false,null);$("apprBody").focus();}
+function afmtColor(c){document.execCommand("foreColor",false,c);$("apprBody").focus();}
+function sendApproval(){
+  const title=$("apprTitle").value.trim();
+  if(!title){toast("Give the request a title");return;}
+  const to={users:{},teams:{}};
+  $("apprChecks").querySelectorAll("input:checked").forEach(i=>{
+    if(i.dataset.kind==="team")to.teams[i.value]=true;else to.users[i.value]=true;});
+  if(!Object.keys(to.users).length&&!Object.keys(to.teams).length){toast("Choose who should approve");return;}
+  db.ref("approvals").push({
+    title, body:sanitize($("apprBody").innerHTML), link:$("apprLink").value.trim(),
+    priority:$("apprPriority").value, to, by:me().user, ts:Date.now(), status:"pending"
+  }).then(()=>toast("Approval request sent ✓"));
+  closeModal("apprCompose");
+}
+function approveIt(id){
+  const a=approvals.find(x=>x.id===id);if(!a||!isApprover(a))return;
+  db.ref("approvals/"+id).update({status:"approved",decidedBy:me().user,decidedAt:Date.now()})
+    .then(()=>toast("Approved ✓"));
+}
+function rejectIt(id){
+  const a=approvals.find(x=>x.id===id);if(!a||!isApprover(a))return;
+  const why=prompt("What needs correcting? (this is sent to them)");
+  if(why===null)return;
+  db.ref("approvals/"+id).update({status:"rejected",decidedBy:me().user,decidedAt:Date.now(),reason:why.trim()})
+    .then(()=>toast("Sent back for correction"));
+}
+function reopenAppr(id){
+  const a=approvals.find(x=>x.id===id);if(!a||a.by!==me().user)return;
+  db.ref("approvals/"+id).update({status:"pending",decidedBy:null,decidedAt:null,reason:null})
+    .then(()=>toast("Resubmitted for approval ✓"));
+}
+function delApproval(id){
+  const a=approvals.find(x=>x.id===id);if(!a)return;
+  if(!isAdminNow()&&a.by!==me().user)return;
+  askConfirm("Delete this request?","The whole thread and its replies will be removed.",
+    ()=>db.ref("approvals/"+id).remove(),"Yes, delete");
+}
+function sendApprReply(id){
+  const box=$("ar_"+id);if(!box)return;
+  const t=box.value.trim();if(!t){toast("Write a reply first");return;}
+  db.ref("approvals/"+id+"/replies").push({by:me().user,text:t,ts:Date.now()}).then(()=>{box.value="";});
+}
+function toggleApprReply(id){
+  const b=$("ab_"+id);if(!b)return;
+  b.classList.toggle("on");
+  if(b.classList.contains("on")){const i=$("ar_"+id);i&&i.focus();}
+}
+function renderApprovals(){
+  const m=me().user;
+  let list=myApprovals();
+  if(apprFilter==="pending")list=list.filter(a=>a.status==="pending");
+  if(apprFilter==="mine")list=list.filter(a=>a.by===m);
+  $("apprSub").textContent=isAdminNow()?"All approval requests across the team.":"Requests waiting on you, and requests you sent.";
+  $("apprRows").innerHTML=list.map(a=>{
+    const who=[...(a.to?.teams?Object.keys(a.to.teams):[]),...(a.to?.users?Object.keys(a.to.users).map(displayName):[])].join(", ");
+    const reps=a.replies?Object.keys(a.replies).map(k=>({id:k,...a.replies[k]})).sort((x,y)=>x.ts-y.ts):[];
+    const mineReq=a.by===m, canApprove=isApprover(a)&&a.status==="pending";
+    const left=a.decidedAt?Math.max(0,Math.round((a.decidedAt+HIDE_AFTER-Date.now())/3600000)):0;
+    return `<div class="appr-card ${a.status}">
+      <div class="appr-top">
+        <span class="appr-state ${a.status}">${a.status==="approved"?"✓ Approved":a.status==="rejected"?"✕ Needs correction":"⏳ Pending"}</span>
+        ${a.priority==="high"?`<span class="pri high">HIGH</span>`:a.priority==="low"?`<span class="pri low">LOW</span>`:""}
+        <b>${esc(a.title)}</b>
+      </div>
+      <div class="task-meta">From ${esc(displayName(a.by))} · To ${esc(who)} · ${new Date(a.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
+        ${a.decidedAt?` · by ${esc(displayName(a.decidedBy))} · hides in ${left}h`:""}</div>
+      ${a.body?`<div class="task-body">${sanitize(a.body)}</div>`:""}
+      ${a.link?`<a class="appr-link" href="${esc(a.link)}" target="_blank">🔗 Open attachment</a>`:""}
+      ${a.reason?`<div class="appr-reason">✎ ${esc(a.reason)}
+        ${(a.decidedBy===m||isAdminNow())?`<button class="btn tiny-btn" title="Edit message" onclick="editReason('${a.id}')">✏️</button>`:""}</div>`:""}
+      <div class="task-actions">
+        ${canApprove?`<button class="btn chip-btn ok" onclick="approveIt('${a.id}')">✓ Approve</button>
+                      <button class="btn chip-btn danger" onclick="rejectIt('${a.id}')">✕ Needs correction</button>`:""}
+        ${(mineReq&&a.status==="rejected")?`<button class="btn chip-btn" onclick="reopenAppr('${a.id}')">↻ Resubmit</button>`:""}
+        <button class="btn chip-btn" onclick="toggleApprReply('${a.id}')">💬 Reply${reps.length?" ("+reps.length+")":""}</button>
+        ${(mineReq||isAdminNow())?`<button class="btn chip-btn" onclick="delApproval('${a.id}')">Delete</button>`:""}
+      </div>
+      <div class="reply-box" id="ab_${a.id}">
+        ${reps.map(r=>`<div class="reply ${r.by===m?"mine":""}"><b>${esc(displayName(r.by))}</b><span>${esc(r.text)}</span>
+          <small>${new Date(r.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}${r.edited?" (edited)":""}</small>
+          ${(isAdminNow()||r.by===m)?`<button class="btn tiny-btn" title="Edit" onclick="editReply('appr','${a.id}','${r.id}','${r.by}')">✏️</button>`:""}
+          </div>`).join("")}
+        <div class="reply-row">
+          <input id="ar_${a.id}" placeholder="Write a reply…" onkeydown="if(event.key==='Enter')sendApprReply('${a.id}')">
+          <button class="btn mini-add todo" onclick="sendApprReply('${a.id}')">SEND</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("")||'<div class="mc-empty" style="padding:14px">Nothing here 🎉</div>';
+}
 
 /* ---------- NOTED ---------- */
 function noteTask(id){
@@ -789,6 +1056,23 @@ function sendReply(id){
   const txt=box.value.trim(); if(!txt){toast("Write a reply first");return;}
   db.ref("tasks/"+id+"/replies").push({by:me().user,text:txt,ts:Date.now()})
     .then(()=>{box.value="";});
+}
+function editReply(kind,pid,rid,by){
+  if(!isAdminNow()&&by!==me().user){toast("You can only edit your own reply");return;}
+  const base=kind==="task"?tasks:approvals;
+  const p=base.find(x=>x.id===pid); if(!p||!p.replies||!p.replies[rid])return;
+  const t=prompt("Edit your reply:",p.replies[rid].text);
+  if(t===null)return;
+  const txt=t.trim(); if(!txt){toast("Reply can't be empty");return;}
+  db.ref((kind==="task"?"tasks/":"approvals/")+pid+"/replies/"+rid)
+    .update({text:txt,edited:Date.now()}).then(()=>toast("Reply updated ✓"));
+}
+function editReason(id){
+  const a=approvals.find(x=>x.id===id); if(!a)return;
+  if(a.decidedBy!==me().user&&!isAdminNow()){toast("Only the approver can edit this");return;}
+  const t=prompt("Edit the correction message:",a.reason||"");
+  if(t===null)return;
+  db.ref("approvals/"+id+"/reason").set(t.trim()).then(()=>toast("Message updated ✓"));
 }
 function toggleReply(id){
   const b=$("rb_"+id); if(!b)return;
@@ -884,3 +1168,148 @@ function showCtx(ev,id){
 function hideCtx(){const m=$("ctxMenu");if(m)m.remove();}
 document.addEventListener("click",hideCtx);
 document.addEventListener("scroll",hideCtx,true);
+
+/* ================= ARCHIVED DATA ================= */
+function monthKey(ts){const d=new Date(ts);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function monthLabel(k){const[y,m]=k.split("-");return new Date(y,m-1,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"});}
+function daysBetween(a,b){if(!a||!b)return null;return Math.max(0,Math.round((b-a)/86400000));}
+function fmtDate(ts){return ts?new Date(ts).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"}):"—";}
+function fmtDateTime(ts){return ts?new Date(ts).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"numeric",minute:"2-digit"}):"—";}
+function namesOf(to){
+  if(!to)return "—";
+  return [...(to.teams?Object.keys(to.teams):[]),...(to.users?Object.keys(to.users).map(displayName):[])].join(", ")||"—";
+}
+
+function archRows(){
+  if(archTab==="appr"){
+    return approvals.map(a=>({
+      id:a.id, title:a.title||"—",
+      from:displayName(a.by), to:namesOf(a.to),
+      status:a.status||"pending",
+      decidedBy:a.decidedBy?displayName(a.decidedBy):"—",
+      created:a.ts||0, closed:a.decidedAt||0,
+      days:daysBetween(a.ts,a.decidedAt),
+      priority:a.priority||"normal",
+      replies:a.replies?Object.keys(a.replies).length:0,
+      note:a.reason||""
+    }));
+  }
+  return tasks.map(t=>({
+    id:t.id, title:t.title||"—",
+    from:displayName(t.by), to:namesOf(t.to),
+    status:t.status==="done"?"completed":"open",
+    decidedBy:t.noted?Object.keys(t.noted).map(displayName).join(", "):"—",
+    created:t.ts||0, closed:t.doneAt||0,
+    days:daysBetween(t.ts,t.doneAt),
+    priority:"—",
+    replies:t.replies?Object.keys(t.replies).length:0,
+    note:""
+  }));
+}
+function archMonths(){
+  const set={};
+  archRows().forEach(r=>{ if(r.created)set[monthKey(r.created)]=1; });
+  const keys=Object.keys(set).sort().reverse();
+  if(!keys.length)keys.push(monthKey(Date.now()));
+  return keys;
+}
+function setArchTab(t){
+  archTab=t;
+  document.querySelectorAll(".arch-tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  $("archSearch").value="";
+  buildArchSelects();
+  renderArchive();
+}
+function buildArchSelects(){
+  const ms=$("archMonth"), cur=ms.value;
+  const months=archMonths();
+  ms.innerHTML=`<option value="all">All months</option>`+months.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join("");
+  ms.value=(cur&&[...ms.options].some(o=>o.value===cur))?cur:months[0];
+  const st=$("archStatus");
+  st.innerHTML=archTab==="appr"
+    ? `<option value="">All statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Needs correction</option>`
+    : `<option value="">All statuses</option><option value="open">Open</option><option value="completed">Completed</option>`;
+}
+function openArchiveData(){
+  if(isCoordinator())return;
+  buildArchSelects();
+  renderArchive();
+  openModal("archModal");
+}
+function sortArch(col){
+  archSort = (archSort.col===col) ? {col,dir:-archSort.dir} : {col,dir:-1};
+  renderArchive();
+}
+function archFiltered(){
+  const mk=$("archMonth").value, q=$("archSearch").value.trim().toLowerCase(), st=$("archStatus").value;
+  let rows=archRows();
+  if(mk&&mk!=="all")rows=rows.filter(r=>r.created&&monthKey(r.created)===mk);
+  if(st)rows=rows.filter(r=>r.status===st);
+  if(q)rows=rows.filter(r=>(r.title+" "+r.from+" "+r.to+" "+r.decidedBy+" "+r.note).toLowerCase().includes(q));
+  const c=archSort.col,d=archSort.dir;
+  return rows.sort((a,b)=>{
+    const x=a[c]??"",y=b[c]??"";
+    if(typeof x==="number"&&typeof y==="number")return (x-y)*d;
+    return String(x).localeCompare(String(y))*d;
+  });
+}
+function renderArchive(){
+  const rows=archFiltered(), isAppr=archTab==="appr";
+  // stat cards
+  const done=rows.filter(r=>r.status==="approved"||r.status==="completed").length;
+  const open=rows.filter(r=>r.status==="pending"||r.status==="open").length;
+  const redo=rows.filter(r=>r.status==="rejected").length;
+  const withDays=rows.filter(r=>r.days!==null);
+  const avg=withDays.length?(withDays.reduce((s,r)=>s+r.days,0)/withDays.length).toFixed(1):"—";
+  $("archStats").innerHTML=`
+    <div class="stat"><b>${rows.length}</b><small>Total</small></div>
+    <div class="stat ok"><b>${done}</b><small>${isAppr?"Approved":"Completed"}</small></div>
+    <div class="stat warn"><b>${open}</b><small>${isAppr?"Pending":"Open"}</small></div>
+    ${isAppr?`<div class="stat bad"><b>${redo}</b><small>Corrections</small></div>`:""}
+    <div class="stat"><b>${avg}</b><small>Avg days to close</small></div>`;
+  // table
+  const th=(k,l)=>`<th onclick="sortArch('${k}')" class="${archSort.col===k?"sorted":""}">${l}${archSort.col===k?(archSort.dir>0?" ▲":" ▼"):""}</th>`;
+  $("archTable").innerHTML=`
+    <thead><tr>
+      ${th("title",isAppr?"Request":"Task")}
+      ${th("from","Raised by")}
+      ${th("to","Sent to")}
+      ${th("status","Status")}
+      ${th("decidedBy",isAppr?"Decided by":"Noted by")}
+      ${th("created","Created")}
+      ${th("closed",isAppr?"Decided":"Completed")}
+      ${th("days","Days")}
+      ${isAppr?th("priority","Priority"):""}
+      ${th("replies","💬")}
+    </tr></thead>
+    <tbody>${rows.map(r=>`
+      <tr>
+        <td class="t-title"><b>${esc(r.title)}</b>${r.note?`<small class="t-note">✎ ${esc(r.note)}</small>`:""}</td>
+        <td>${esc(r.from)}</td>
+        <td class="t-wrap">${esc(r.to)}</td>
+        <td><span class="st-pill ${r.status}">${r.status==="approved"?"Approved":r.status==="rejected"?"Correction":r.status==="completed"?"Completed":r.status==="pending"?"Pending":"Open"}</span></td>
+        <td>${esc(r.decidedBy)}</td>
+        <td>${fmtDate(r.created)}</td>
+        <td>${fmtDate(r.closed)}</td>
+        <td class="t-days">${r.days===null?"—":r.days===0?"same day":r.days+"d"}</td>
+        ${isAppr?`<td><span class="pri ${r.priority}">${r.priority==="high"?"HIGH":r.priority==="low"?"LOW":"—"}</span></td>`:""}
+        <td>${r.replies||"—"}</td>
+      </tr>`).join("")||`<tr><td colspan="10" class="arch-empty">Nothing found for this month</td></tr>`}
+    </tbody>`;
+  const mk=$("archMonth").value;
+  $("archFoot").textContent=`${rows.length} record${rows.length===1?"":"s"} · ${mk==="all"?"all months":monthLabel(mk)}`;
+}
+function exportArchive(){
+  const rows=archFiltered(), isAppr=archTab==="appr";
+  const head=["Title","Raised by","Sent to","Status",isAppr?"Decided by":"Noted by","Created","Closed","Days",isAppr?"Priority":"","Replies","Note"];
+  const csv=[head.join(",")].concat(rows.map(r=>[
+    r.title,r.from,r.to,r.status,r.decidedBy,fmtDateTime(r.created),fmtDateTime(r.closed),
+    r.days===null?"":r.days,isAppr?r.priority:"",r.replies,r.note
+  ].map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(","))).join("\n");
+  const mk=$("archMonth").value;
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="ODEA_"+(isAppr?"Approvals_":"Tasks_")+(mk==="all"?"all":mk)+".csv";
+  a.click();
+  toast("CSV downloaded ✓");
+}

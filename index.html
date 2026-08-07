@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ODEA Sheets HUB</title>
-<link rel="icon" type="image/png" href="Sheets HUB logo.webp">
+<link rel="icon" type="image/webp" href="Sheets HUB logo.webp">
 <link rel="apple-touch-icon" href="Sheets HUB logo.webp">
 <meta name="theme-color" content="#1A1A1A">
 <link rel="manifest" href="manifest.json">
@@ -75,9 +75,11 @@
     <div class="topbar">
       <button class="btn burger" id="burgerBtn" onclick="smartToggle()">◀</button>
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
+      <button class="btn top-btn" id="archBtn" onclick="openArchiveData()">🗄️ <span class="lbl">Archive</span></button>
       <button class="btn top-btn" id="boardBtn" onclick="showBoard()" style="background:linear-gradient(120deg,#E85A4F,#FF3B30);border-color:transparent;color:#fff;font-weight:700;box-shadow:0 6px 16px rgba(232,90,79,.4)">📋 <span class="lbl">To-Do / EOD</span></button>
       <button class="btn top-btn" id="tasksBtn" onclick="openTasks()">🔔 <span class="lbl">Tasks</span><span class="badge" id="taskBadge" style="display:none">0</span></button>
       <button class="btn icon-btn" id="themeBtn" onclick="toggleTheme()" title="Theme">🌙</button>
+      <button class="btn top-btn" id="apprBtn" onclick="openApprovals()">✅ <span class="lbl">Approvals</span><span class="badge" id="apprBadge"></span></button>
       <a class="top-btn" id="openExt" href="#" target="_blank" style="display:none">↗ <span class="lbl">Open in Google</span></a>
     </div>
     <div class="stage" id="stage"></div>
@@ -222,6 +224,84 @@
       <button class="btn btn-cancel" onclick="closeModal('folderModal')">Cancel</button>
       <button class="btn btn-royal" style="margin-top:0" id="folderSaveBtn" onclick="saveFolder()">Create folder</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="apprModal">
+  <div class="modal wide">
+    <h3>Approvals</h3>
+    <p class="m-sub" id="apprSub">Requests waiting on you, and requests you sent.</p>
+    <button class="btn btn-royal" style="margin-bottom:16px" onclick="openApprCompose()">+ Request an approval</button>
+    <div class="appr-filters">
+      <button class="btn chip-btn af on" data-f="all" onclick="setApprFilter('all')">All</button>
+      <button class="btn chip-btn af" data-f="pending" onclick="setApprFilter('pending')">Pending</button>
+      <button class="btn chip-btn af" data-f="mine" onclick="setApprFilter('mine')">My requests</button>
+    </div>
+    <div id="apprRows"></div>
+    <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('apprModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="apprCompose">
+  <div class="modal">
+    <h3>Request an approval</h3>
+    <p class="m-sub">Send work for sign-off. The approver is notified instantly.</p>
+    <div class="field"><label>Title</label><input id="apprTitle" placeholder="e.g. Terrazzo reel — final cut"></div>
+    <div class="field"><label>Priority</label>
+      <select class="f-input" id="apprPriority">
+        <option value="normal">Normal</option>
+        <option value="high">High — needed today</option>
+        <option value="low">Low — whenever</option>
+      </select>
+    </div>
+    <div class="field"><label>Link (optional)</label><input id="apprLink" placeholder="Drive / Figma / sheet link"></div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:8px">Details</label>
+    <div class="editor-tools">
+      <button class="btn ed-btn" onclick="afmt('bold')"><b>B</b></button>
+      <button class="btn ed-btn" onclick="afmt('italic')"><i>I</i></button>
+      <button class="btn ed-btn" onclick="afmt('insertUnorderedList')">• List</button>
+      <button class="btn ed-btn clr" style="background:#F15A22" onclick="afmtColor('#F15A22')"></button>
+      <button class="btn ed-btn clr" style="background:#3DC97A" onclick="afmtColor('#3DC97A')"></button>
+      <button class="btn ed-btn clr" style="background:#E85A4F" onclick="afmtColor('#E85A4F')"></button>
+    </div>
+    <div class="rich-input" id="apprBody" contenteditable="true" data-ph="What needs approval?"></div>
+    <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin:16px 0 8px">Send to</label>
+    <div class="check-grid" id="apprChecks"></div>
+    <div class="m-row">
+      <button class="btn btn-cancel" onclick="closeModal('apprCompose')">Cancel</button>
+      <button class="btn btn-royal" style="margin-top:0" onclick="sendApproval()">Send request</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="archModal">
+  <div class="modal arch-modal">
+    <div class="arch-head">
+      <div>
+        <h3>Archived data</h3>
+        <p class="m-sub" style="margin:0">Every approval and task, month by month.</p>
+      </div>
+      <button class="btn btn-cancel arch-x" onclick="closeModal('archModal')">✕</button>
+    </div>
+
+    <div class="arch-bar">
+      <div class="arch-tabs">
+        <button class="btn arch-tab on" data-t="appr" onclick="setArchTab('appr')">✅ Approvals</button>
+        <button class="btn arch-tab" data-t="task" onclick="setArchTab('task')">🔔 Tasks</button>
+      </div>
+      <div class="arch-tools">
+        <input id="archSearch" class="arch-search" placeholder="🔍 Search this month…" oninput="renderArchive()">
+        <select class="f-input arch-select" id="archStatus" onchange="renderArchive()">
+          <option value="">All statuses</option>
+        </select>
+        <select class="f-input arch-select" id="archMonth" onchange="renderArchive()"></select>
+        <button class="btn ghost-btn arch-export" onclick="exportArchive()">⬇ CSV</button>
+      </div>
+    </div>
+
+    <div class="arch-stats" id="archStats"></div>
+    <div class="arch-wrap"><table class="arch-table" id="archTable"></table></div>
+    <div class="arch-foot" id="archFoot"></div>
   </div>
 </div>
 
