@@ -187,6 +187,7 @@ function enterApp(){
   $("archBtn")&&($("archBtn").style.display=co?"none":"");
   showWelcome(); renderFolders(); updateTaskBadge();
   askNotifyPermission();
+  bootDigest();
   const want=new URLSearchParams(location.search).get("sheet");
   if(want) setTimeout(()=>openSheet(want),600);   // deep link from a new tab
   if(co)openTasks();   // coordinators land straight in their one job
@@ -733,7 +734,7 @@ function notifyCheck(){
         a.status==="approved"?"You approved ✓":"Sent back ✎",a.title));
 
   markSeen(seen);
-  if(!_notifyReady){ _notifyReady=true; digestAlert(); return; }
+  if(!_notifyReady){ _notifyReady=true; return; }
   fresh.slice(0,3).forEach((f,i)=>setTimeout(()=>popAlert(f.kind,f.text,f.sub,f.from,f.uid),i*450));
 }
 
@@ -775,8 +776,13 @@ function digestAlert(){
   document.querySelectorAll(".task-alert").forEach(e=>e.remove());
   list.slice(0,8).forEach((f,i)=>setTimeout(()=>popAlert(f.kind,f.text,f.sub,f.from,"__digest"),i*900));
 }
-let _leftAt=0;
+let _leftAt=0, _bootDigestDone=false;
 const AWAY_MIN=2*60*1000;          // must be away 2 minutes to get the digest
+function bootDigest(){             // fires on login, refresh, and first load of the day
+  if(_bootDigestDone||!session())return;
+  _bootDigestDone=true;
+  setTimeout(digestAlert,1200);    // wait for Firebase data to arrive
+}
 // const AWAY_MIN=10*1000;   // 10 seconds, for testing
 function markAway(){ _leftAt=Date.now(); }
 function maybeDigest(){
