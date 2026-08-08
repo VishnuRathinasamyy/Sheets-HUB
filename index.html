@@ -33,7 +33,7 @@
     <button class="btn btn-royal" onclick="doLogin()">Sign in</button>
     <div class="login-err" id="loginErr">Incorrect username or password.</div>
     <div class="sync-pill" id="syncPill"><i></i><span id="syncText">Connecting…</span></div>
-    <div class="login-foot">ODEA Development · Coimbatore</div>
+    <div class="login-foot">ODEA Edu Development · Coimbatore</div>
   </div>
 </div>
 
@@ -45,7 +45,7 @@
     <div class="brand">
       <div class="mini-crest"><img src="logo.png" alt="ODEA"></div>
       <div>
-        <div class="brand-name">ODEA <em>Development</em></div>
+        <div class="brand-name">ODEA <em>Edu Development</em></div>
         <div class="brand-tag">Sheets Hub</div>
       </div>
     </div>
@@ -194,6 +194,14 @@
     <p class="m-sub">Change your display name and photo. Visible to the whole team.</p>
     <div style="display:flex;justify-content:center;margin-bottom:14px" id="pfPreview"></div>
     <div class="field"><label>Display name</label><input id="pfName" placeholder="Your name"></div>
+    <div class="field"><label>Designation</label><input id="pfRoleTitle" placeholder="e.g. Senior Video Editor"></div>
+    <div class="field"><label>Date of birth</label><input id="pfDob" type="date"></div>
+    <div class="field"><label>Joined on</label><input id="pfJoined" type="date"></div>
+    <div class="field"><label>Phone</label><input id="pfPhone" placeholder="+91 …"></div>
+    <div class="field"><label>Email</label><input id="pfEmail" placeholder="name@odea.in"></div>
+    <div class="field"><label>Blood group</label><input id="pfBlood" placeholder="e.g. O+" maxlength="5"></div>
+    <div class="field"><label>Skills</label><input id="pfSkills" placeholder="Premiere Pro, After Effects, DaVinci"></div>
+    <div class="field"><label>Tagline</label><input id="pfTag" placeholder="A short line about you"></div>
     <div class="field"><label>Profile photo</label><input class="f-input" type="file" id="pfFile" accept="image/*" onchange="pfPickPhoto(this)"></div>
     <button class="btn ghost-btn" style="width:100%;margin-top:-6px" onclick="clearPhoto()">Remove photo</button>
     <div class="m-row">
@@ -303,6 +311,17 @@
     <div class="arch-wrap"><table class="arch-table" id="archTable"></table></div>
     <div class="arch-foot" id="archFoot"></div>
   </div>
+</div>
+
+<div class="overlay idcard-overlay" id="idModal">
+  <div class="id-stage">
+    <div class="id-card" id="idCard"></div>
+  </div>
+</div>
+
+<div class="overlay bday-overlay" id="bdayModal">
+  <div class="bday-fx" id="bdayFx"></div>
+  <div class="bday-card" id="bdayCard"></div>
 </div>
 
 <div class="toast" id="toast"></div>

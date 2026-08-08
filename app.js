@@ -188,6 +188,7 @@ function enterApp(){
   showWelcome(); renderFolders(); updateTaskBadge();
   askNotifyPermission();
   bootDigest();
+  setTimeout(()=>{checkMyBirthday();birthdayHeads();},2000);
   const want=new URLSearchParams(location.search).get("sheet");
   if(want) setTimeout(()=>openSheet(want),600);   // deep link from a new tab
   if(co)openTasks();   // coordinators land straight in their one job
@@ -498,8 +499,9 @@ function renderBoard(){
         ${canDeleteEntry(e)?`<button class="btn entry-edit" title="Edit" onclick="editEntry('${e.id}')">✏️</button><button class="btn entry-del" onclick="delEntry('${e.id}')">✕</button>`:""}
       </div>`;
     return `
-    <div class="member-card ${u.user===mine?"me":""}" data-id="${esc(u.user)}">
-      <div class="mc-head">
+    <div class="member-card ${u.user===mine?"me":""}${isBirthdayToday(u.dob)?" bday-card-on":""}" data-id="${esc(u.user)}">
+      ${isBirthdayToday(u.dob)?`<div class="bday-bow">🎀</div><div class="bday-ribbon">🎂 BIRTHDAY</div>`:""}
+      <div class="mc-head id-open" onclick="showIdCard('${esc(u.user)}')" title="View ID card">
         ${avatarHTML(u.user)}
         <div class="who"><b>${esc(u.name||cap(u.user))}</b><small>${esc(roleLabel(u.role||"member"))}${myTeams(u.user).length?" · "+esc(myTeams(u.user).join(", ")):""}</small></div>
       </div>
@@ -625,6 +627,10 @@ function openProfile(){
   if(isMaster&&!cloudOn){toast("Cloud not connected");return;}
   const r=userRec(s.user);
   $("pfName").value=r.name||"";
+  $("pfRoleTitle").value=r.title||"";$("pfDob").value=r.dob||"";
+  $("pfJoined").value=r.joined||"";$("pfPhone").value=r.phone||"";
+  $("pfEmail").value=r.email||"";$("pfBlood").value=r.blood||"";
+  $("pfSkills").value=r.skills||"";$("pfTag").value=r.tagline||"";
   $("pfPreview").innerHTML=avatarHTML(s.user,72);
   $("pfFile").value="";
   openModal("profileModal");
@@ -633,11 +639,12 @@ function pfPickPhoto(input){
   const f=input.files&&input.files[0];if(!f)return;
   const img=new Image();
   img.onload=()=>{
-    const c=document.createElement("canvas");const S=96;c.width=S;c.height=S;
+    // const c=document.createElement("canvas");const S=400;c.width=S;c.height=S;
+    window._pfPhoto=c.toDataURL("image/jpeg",.92);
     const x=c.getContext("2d");
     const side=Math.min(img.width,img.height);
     x.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
-    window._pfPhoto=c.toDataURL("image/jpeg",.82);
+    window._pfPhoto=c.toDataURL("image/jpeg",.92);
     $("pfPreview").innerHTML=`<div class="avatar" style="width:72px;height:72px"><img src="${window._pfPhoto}"></div>`;
   };
   img.src=URL.createObjectURL(f);
@@ -647,10 +654,18 @@ function saveProfile(){
   const name=$("pfName").value.trim();
   const isMaster=!cloudUsers.some(u=>u.user===s.user);
   const path=isMaster?("masters/"+s.user):("users/"+s.user);
-  const upd={};
+  const upd={
+    title:$("pfRoleTitle").value.trim()||null,
+    dob:$("pfDob").value||null,
+    joined:$("pfJoined").value||null,
+    phone:$("pfPhone").value.trim()||null,
+    email:$("pfEmail").value.trim()||null,
+    blood:$("pfBlood").value.trim()||null,
+    skills:$("pfSkills").value.trim()||null,
+    tagline:$("pfTag").value.trim()||null
+  };
   if(name)upd.name=name;
   if(window._pfPhoto)upd.photo=window._pfPhoto;
-  if(!Object.keys(upd).length){closeModal("profileModal");return;}
   db.ref(path).update(upd).then(()=>{
     if(name){s.name=name;sessionStorage.setItem(LS_SESSION,JSON.stringify(s));}
     window._pfPhoto=null;
@@ -1318,4 +1333,159 @@ function exportArchive(){
   a.download="ODEA_"+(isAppr?"Approvals_":"Tasks_")+(mk==="all"?"all":mk)+".csv";
   a.click();
   toast("CSV downloaded ✓");
+}
+
+/* ================= EMPLOYEE ID CARD ================= */
+function ageFrom(d){ if(!d)return null; const b=new Date(d),n=new Date();
+  let a=n.getFullYear()-b.getFullYear(); const m=n.getMonth()-b.getMonth();
+  if(m<0||(m===0&&n.getDate()<b.getDate()))a--; return a; }
+function tenure(d){ if(!d)return null; const j=new Date(d),n=new Date();
+  const mo=(n.getFullYear()-j.getFullYear())*12+(n.getMonth()-j.getMonth());
+  if(mo<1)return "New joiner";
+  if(mo<12)return mo+" month"+(mo>1?"s":"");
+  const y=Math.floor(mo/12),r=mo%12;
+  return y+" yr"+(y>1?"s":"")+(r?" "+r+" mo":""); }
+function isBirthdayToday(d){ if(!d)return false; const b=new Date(d),n=new Date();
+  return b.getDate()===n.getDate()&&b.getMonth()===n.getMonth(); }
+function empId(u){ let h=0; for(let i=0;i<u.length;i++)h=(h*31+u.charCodeAt(i))>>>0;
+  return "ODEA-"+String(h%9000+1000); }
+
+function showIdCard(user){
+  const r=userRec(user); if(!r||!r.user&&!r.name)return;
+  const my=entries.filter(e=>e.user===user);
+  const doneToday=my.filter(e=>e.status==="done").length;
+  const openNow=my.filter(e=>e.status!=="done").length;
+  const myTasks=tasks.filter(t=>t.to&&((t.to.users&&t.to.users[user])||(t.to.teams&&(r.teams?Object.keys(r.teams):r.team?[r.team]:[]).some(x=>t.to.teams[x]))));
+  const tDone=myTasks.filter(t=>t.status==="done").length;
+  const bday=isBirthdayToday(r.dob);
+  const age=ageFrom(r.dob), ten=tenure(r.joined);
+  const teamsTxt=myTeams(user).join(" · ")||"—";
+  const line=(l,v)=>v?`<div class="idr"><span>${l}</span><b>${esc(v)}</b></div>`:"";
+
+
+  const cell=(l,v)=>`<div class="idc"><span>${l}</span><b>${v?esc(v):"—"}</b></div>`;
+  $("idCard").innerHTML=`
+    ${bday?`<div class="id-bday">🎂 BIRTHDAY</div>`:""}
+    <div class="id-strip"><img src="logo.png" alt=""><span>ODEA <em>Edu Development</em></span></div>
+    <div class="id-hero">
+      <div class="id-photo">${avatarHTML(user,110)}</div>
+      <div class="id-hero-txt">
+        <h3 class="id-name">${esc(r.name||cap(user))}</h3>
+        <div class="id-title">${esc(r.title||roleLabel(r.role||"member"))}</div>
+        <div class="id-team">${esc(teamsTxt)}</div>
+      </div>
+    </div>
+    ${r.tagline?`<div class="id-tag">"${esc(r.tagline)}"</div>`:""}
+    <div class="id-grid">
+      ${cell("ID",empId(user))}
+      ${cell("Blood",r.blood)}
+      ${cell("Born",r.dob?new Date(r.dob).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(age?" · "+age:""):"")}
+      ${cell("Tenure",ten)}
+      ${cell("Phone",r.phone)}
+      ${cell("Email",r.email)}
+    </div>
+    ${r.skills?`<div class="id-skills">${r.skills.split(",").map(s=>s.trim()).filter(Boolean).map(s=>`<span>${esc(s)}</span>`).join("")}</div>`:""}
+    <div class="id-stats">
+      <div><b>${doneToday}</b><small>Done</small></div>
+      <div><b>${openNow}</b><small>Open</small></div>
+      <div><b>${tDone}/${myTasks.length}</b><small>Tasks</small></div>
+    </div>
+    <div class="id-foot"><span>@${esc(user)}</span><small>ODEA EDU DEVELOPMENT · COIMBATORE</small></div>`;
+  openModal("idModal");
+  const c=$("idCard");
+  c.classList.remove("swing"); void c.offsetWidth; c.classList.add("swing");
+}
+
+
+
+
+/* ================= BIRTHDAY CELEBRATION ================= */
+const BDAY_WISHES=[
+  "Another year of legendary work 🚀",
+  "May your renders never crash today 🎬",
+  "Cake first, deadlines later 🍰",
+  "The whole ODEA family is celebrating you 🧡",
+  "Wishing you zero revisions this year ✨",
+  "Officially one year more experienced 😎",
+  "Today your To-Do list is just: enjoy 🎉"
+];
+const BDAY_EMOJI=["🎈","🎉","🎂","🥳","🎁","✨","🎊","🍰","🧁","💛","🎀","⭐"];
+
+function bdayKey(){return "odea_bday_"+(me().user||"anon")+"_"+todayIST();}
+function checkMyBirthday(){
+  const s=session(); if(!s)return;
+  const r=userRec(s.user);
+  if(!isBirthdayToday(r.dob))return;
+  setTimeout(()=>showBirthday(s.user),1600);      // every login & refresh, all day
+}
+function showBirthday(user){
+  const r=userRec(user);
+  const age=ageFrom(r.dob);
+  const wish=BDAY_WISHES[Math.floor(Math.random()*BDAY_WISHES.length)];
+  $("bdayCard").innerHTML=`
+    <div class="bd-glow"></div>
+    <div class="bd-bow">🎀</div>
+    <div class="bd-cake">🎂</div>
+    <h2>Happy Birthday,<br><em>${esc(r.name||cap(user))}</em>!</h2>
+    ${age?`<div class="bd-age">${age}<small>years young</small></div>`:""}
+    <p class="bd-wish">${wish}</p>
+    <div class="bd-emojis">${BDAY_EMOJI.slice(0,7).map(e=>`<span>${e}</span>`).join("")}</div>
+    <div class="bd-from">— from everyone at <b>ODEA Edu Development</b> 🧡</div>
+    <button class="btn btn-royal bd-btn" onclick="closeModal('bdayModal')">Thank you! 🥳</button>`;
+  buildBdayFx();
+  openModal("bdayModal");
+  burstConfetti(90);
+  setTimeout(()=>burstConfetti(60),900);
+  setTimeout(()=>burstConfetti(60),1900);
+}
+function buildBdayFx(){
+  const fx=$("bdayFx"); fx.innerHTML="";
+  for(let i=0;i<16;i++){                          // floating balloons
+    const b=document.createElement("div");
+    b.className="balloon";
+    b.style.left=(Math.random()*96)+"%";
+    b.style.setProperty("--h",["#F15A22","#E8B44A","#7A5CE0","#3DC97A","#E85A4F","#FF7300"][i%6]);
+    b.style.animationDelay=(Math.random()*6)+"s";
+    b.style.animationDuration=(7+Math.random()*6)+"s";
+    b.style.setProperty("--sc",(.7+Math.random()*.6).toFixed(2));
+    fx.appendChild(b);
+  }
+  for(let i=0;i<14;i++){                          // drifting emojis
+    const e=document.createElement("div");
+    e.className="floaty";
+    e.textContent=BDAY_EMOJI[Math.floor(Math.random()*BDAY_EMOJI.length)];
+    e.style.left=(Math.random()*94)+"%";
+    e.style.animationDelay=(Math.random()*8)+"s";
+    e.style.animationDuration=(9+Math.random()*7)+"s";
+    e.style.fontSize=(18+Math.random()*22)+"px";
+    fx.appendChild(e);
+  }
+}
+function burstConfetti(n){
+  const fx=$("bdayFx"); if(!fx)return;
+  const cols=["#F15A22","#E8B44A","#7A5CE0","#3DC97A","#FF7300","#FFD966","#E85A4F"];
+  for(let i=0;i<n;i++){
+    const c=document.createElement("i");
+    c.className="conf";
+    c.style.left=(Math.random()*100)+"%";
+    c.style.background=cols[Math.floor(Math.random()*cols.length)];
+    c.style.animationDelay=(Math.random()*.5)+"s";
+    c.style.animationDuration=(2.4+Math.random()*2.2)+"s";
+    c.style.setProperty("--x",(Math.random()*280-140)+"px");
+    c.style.setProperty("--r",(Math.random()*900-450)+"deg");
+    if(Math.random()>.6)c.style.borderRadius="50%";
+    fx.appendChild(c);
+    setTimeout(()=>c.remove(),5200);
+  }
+}
+/* birthday wishes for OTHERS — a gentle heads-up popup */
+function birthdayHeads(){
+  const s=session(); if(!s)return;
+  const others=allUsers().filter(u=>u.user!==s.user&&isBirthdayToday(u.dob));
+  others.forEach((u,i)=>{
+    const k="odea_bdnote_"+s.user+"_"+u.user+"_"+todayIST();
+    if(localStorage.getItem(k))return;
+    localStorage.setItem(k,"1");
+    setTimeout(()=>popAlert("noted","🎂 It's "+displayName(u.user)+"'s birthday!","Send them your wishes",u.user,"bd_"+u.user),2600+i*1100);
+  });
 }
