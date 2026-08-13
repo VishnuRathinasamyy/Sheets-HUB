@@ -636,18 +636,28 @@ function openProfile(){
   openModal("profileModal");
 }
 function pfPickPhoto(input){
-  const f=input.files&&input.files[0];if(!f)return;
-  const img=new Image();
-  img.onload=()=>{
-    // const c=document.createElement("canvas");const S=400;c.width=S;c.height=S;
-    window._pfPhoto=c.toDataURL("image/jpeg",.92);
-    const x=c.getContext("2d");
-    const side=Math.min(img.width,img.height);
-    x.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
-    window._pfPhoto=c.toDataURL("image/jpeg",.92);
-    $("pfPreview").innerHTML=`<div class="avatar" style="width:72px;height:72px"><img src="${window._pfPhoto}"></div>`;
+  const f=input.files&&input.files[0];
+  if(!f){toast("No file selected");return;}
+  if(!/^image\//.test(f.type)){toast("Please choose an image file");return;}
+  const rd=new FileReader();
+  rd.onerror=()=>toast("Couldn't read that file — try a JPG or PNG");
+  rd.onload=()=>{
+    const img=new Image();
+    img.onerror=()=>toast("Couldn't open that image (HEIC files aren't supported)");
+    img.onload=()=>{
+      const S=512;
+      const c=document.createElement("canvas");c.width=S;c.height=S;
+      const x=c.getContext("2d");
+      x.imageSmoothingEnabled=true; x.imageSmoothingQuality="high";
+      const side=Math.min(img.naturalWidth,img.naturalHeight);
+      x.drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,S,S);
+      window._pfPhoto=c.toDataURL("image/jpeg",.92);
+      $("pfPreview").innerHTML=`<div class="avatar" style="width:72px;height:72px"><img src="${window._pfPhoto}"></div>`;
+      toast("Photo ready — click Save");
+    };
+    img.src=rd.result;          // base64, avoids blob-URL timing issues
   };
-  img.src=URL.createObjectURL(f);
+  rd.readAsDataURL(f);
 }
 function saveProfile(){
   const s=session();if(!s||!cloudOn)return;
@@ -665,11 +675,19 @@ function saveProfile(){
     tagline:$("pfTag").value.trim()||null
   };
   if(name)upd.name=name;
-  if(window._pfPhoto)upd.photo=window._pfPhoto;
+  if(window._pfPhoto){
+    if(window._pfPhoto.length>800000){toast("Photo too large — try a smaller image");return;}
+    upd.photo=window._pfPhoto;
+  }
   db.ref(path).update(upd).then(()=>{
     if(name){s.name=name;sessionStorage.setItem(LS_SESSION,JSON.stringify(s));}
     window._pfPhoto=null;
-    toast("Profile updated ✓");refreshMyChip();closeModal("profileModal");
+    toast("Profile updated ✓");refreshMyChip();
+    if(currentView==="board")renderBoard();
+    closeModal("profileModal");
+  }).catch(err=>{
+    console.error("Profile save failed:",err);
+    toast("Save failed: "+(err.message||"check connection"));
   });
 }
 
