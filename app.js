@@ -488,6 +488,14 @@ function canDeleteEntry(e){
 }
 function renderBoard(){
   if(currentView!=="board")return;
+  // remember what people are typing + where they're scrolled
+  const drafts={}, act=document.activeElement;
+  const focusId=(act&&act.id&&act.id.startsWith("in_"))?act.id:null;
+  const caret=focusId?act.selectionStart:null;
+  document.querySelectorAll('[id^="in_"]').forEach(i=>{ if(i.value)drafts[i.id]=i.value; });
+  const scroller=$("stage").querySelector(".board");
+  const scrollY=scroller?scroller.scrollTop:0;
+  const pageY=$("stage").scrollTop;
   const mine=me().user, locked=isLocked();
   const cards=boardMembers().map(u=>{
     const my=entries.filter(e=>e.user===u.user).sort((a,b)=>(a.ts||0)-(b.ts||0));
@@ -530,6 +538,15 @@ function renderBoard(){
       </div>
       <div class="board-grid">${cards}</div>
     </div>`;
+    // put the drafts and scroll position back
+  Object.keys(drafts).forEach(id=>{ const el=$(id); if(el)el.value=drafts[id]; });
+  const nb=$("stage").querySelector(".board");
+  if(nb&&scrollY)nb.scrollTop=scrollY;
+  if(pageY)$("stage").scrollTop=pageY;
+  if(focusId){
+    const el=$(focusId);
+    if(el){ el.focus(); try{ el.setSelectionRange(caret,caret); }catch(e){} }
+  }
   if(cloudOn)enableDrag($("stage").querySelector(".board-grid"),".member-card[data-id]",ids=>{
     ids.forEach((id,i)=>{ if(cloudUsers.some(u=>u.user===id)) db.ref("users/"+id+"/order").set(i); });
   });
@@ -545,13 +562,20 @@ function addEntry(user){
 function cycleStatus(id){
   const e=entries.find(x=>x.id===id);if(!e)return;
   if(e.user!==me().user&&!isAdminNow()){toast("You can only change your own tasks");return;}
-  const next={pending:"progress",progress:"done",done:"pending"}[e.status||"pending"];
-  db.ref("entries/"+id+"/status").set(next);
+    const next={pending:"progress",progress:"done",done:"pending"}[e.status||"pending"];
+  const y=$("stage").scrollTop;
+  db.ref("entries/"+id+"/status").set(next).then(()=>setTimeout(()=>{$("stage").scrollTop=y;},30));
 }
 function delEntry(id){
   const e=entries.find(x=>x.id===id);if(!e)return;
   if(!canDeleteEntry(e)){toast((e.days||1)>1?"Carried tasks: admin only":"Locked after 5 PM");return;}
-  db.ref("entries/"+id).remove();
+  const y=$("stage").scrollTop, b=$("stage").querySelector(".board"), by=b?b.scrollTop:0;
+  db.ref("entries/"+id).remove().then(()=>{
+    setTimeout(()=>{
+      $("stage").scrollTop=y;
+      const nb=$("stage").querySelector(".board"); if(nb)nb.scrollTop=by;
+    },30);
+  });
 }
 function editEntry(id){
   const e=entries.find(x=>x.id===id);if(!e)return;
