@@ -26,6 +26,8 @@ let sheets=[], cloudUsers=[], teams=[], entries=[], tasks=[], settings={};
 let activeId=null, editingSheetId=null, editingUserKey=null, currentView="welcome";
 let folders=[], editingFolderId=null, openFolders=JSON.parse(localStorage.getItem("odea_openfolders")||"{}");
 let approvals=[], apprFilter="all";
+let calls=[], activeCall=null, ringTimer=null, ringCtx=null, ringStop=null, dnd=localStorage.getItem("odea_dnd")==="1";
+const RING_SECONDS=30;
 let archTab="appr", archSort={col:"created",dir:-1};
 const HIDE_AFTER=12*60*60*1000;   // approved/completed items vanish after 12 hours
 let pins={};
@@ -130,6 +132,9 @@ function bootCloud(){
       approvals=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
       updateApprBadge(); notifyCheck();
       if($("apprModal").classList.contains("on"))renderApprovals();});
+        db.ref("calls").on("value",s=>{const v=s.val()||{};
+      calls=Object.keys(v).map(k=>({id:k,...v[k]}));
+      handleCalls();});
     db.ref("settings").on("value",s=>{settings=s.val()||{};
       if($("settingsModal").classList.contains("on"))$("archiveUrl").value=settings.archiveUrl||"";
       renderFolders();});
@@ -186,8 +191,9 @@ function enterApp(){
   $("apprBtn")&&($("apprBtn").style.display=co?"none":"");
   $("archBtn")&&($("archBtn").style.display=co?"none":"");
   showWelcome(); renderFolders(); updateTaskBadge();
-  askNotifyPermission();
+    askNotifyPermission();
   bootDigest();
+  if("speechSynthesis" in window)speechSynthesis.getVoices();   // warm up voices
   setTimeout(()=>{checkMyBirthday();birthdayHeads();},2000);
   const want=new URLSearchParams(location.search).get("sheet");
   if(want) setTimeout(()=>openSheet(want),600);   // deep link from a new tab
@@ -492,7 +498,11 @@ function renderBoard(){
   const drafts={}, act=document.activeElement;
   const focusId=(act&&act.id&&act.id.startsWith("in_"))?act.id:null;
   const caret=focusId?act.selectionStart:null;
-  document.querySelectorAll('[id^="in_"]').forEach(i=>{ if(i.value)drafts[i.id]=i.value; });
+    const now=Date.now();
+  document.querySelectorAll('[id^="in_"]').forEach(i=>{
+    if(_justSent[i.id]&&now-_justSent[i.id]<3000){ delete _justSent[i.id]; return; }
+    if(i.value)drafts[i.id]=i.value;
+  });
   const scroller=$("stage").querySelector(".board");
   const scrollY=scroller?scroller.scrollTop:0;
   const pageY=$("stage").scrollTop;
@@ -509,6 +519,7 @@ function renderBoard(){
     return `
     <div class="member-card ${u.user===mine?"me":""}${isBirthdayToday(u.dob)?" bday-card-on":""}" data-id="${esc(u.user)}">
       ${isBirthdayToday(u.dob)?`<div class="bday-bow">🎀</div><div class="bday-ribbon">🎂 BIRTHDAY</div>`:""}
+      ${u.user!==mine?`<button class="btn call-btn" title="Ring ${esc(u.name||u.user)}" onclick="startCall('${esc(u.user)}')">📞</button>`:`<button class="btn call-btn dnd-btn ${dnd?"on":""}" title="Do not disturb" onclick="toggleDnd()">${dnd?"🔕":"🔔"}</button>`}
       <div class="mc-head id-open" onclick="showIdCard('${esc(u.user)}')" title="View ID card">
         ${avatarHTML(u.user)}
         <div class="who"><b>${esc(u.name||cap(u.user))}</b><small>${esc(roleLabel(u.role||"member"))}${myTeams(u.user).length?" · "+esc(myTeams(u.user).join(", ")):""}</small></div>
@@ -551,13 +562,14 @@ function renderBoard(){
     ids.forEach((id,i)=>{ if(cloudUsers.some(u=>u.user===id)) db.ref("users/"+id+"/order").set(i); });
   });
 }
+let _justSent={};
 function addEntry(user){
-  // if(!isAdminNow()&&isLocked()){toast("Board is locked after 5 PM — ask an admin");return;}
   const inp=$("in_"+user);if(!inp)return;
   const text=inp.value.trim();if(!text){toast("Write something first");return;}
   if(!cloudOn){toast("Cloud not connected");return;}
-  db.ref("entries").push({user,type:"todo",text,status:"pending",date:todayIST(),ts:Date.now()});
   inp.value="";
+  _justSent["in_"+user]=Date.now();          // don't restore a draft for this box
+  db.ref("entries").push({user,type:"todo",text,status:"pending",date:todayIST(),ts:Date.now()});
 }
 function cycleStatus(id){
   const e=entries.find(x=>x.id===id);if(!e)return;
@@ -1531,3 +1543,188 @@ function birthdayHeads(){
     setTimeout(()=>popAlert("noted","🎂 It's "+displayName(u.user)+"'s birthday!","Send them your wishes",u.user,"bd_"+u.user),2600+i*1100);
   });
 }
+
+
+
+
+
+/* ================= ODEA INTERCOM (call / ping) ================= */
+function toggleDnd(){
+  dnd=!dnd; localStorage.setItem("odea_dnd",dnd?"1":"0");
+  toast(dnd?"Do not disturb ON — calls stay silent":"Do not disturb OFF");
+  if(currentView==="board")renderBoard();
+}
+function startCall(to){
+  if(!cloudOn)return;
+  if(activeCall){toast("Finish the current call first");return;}
+  const note=prompt("Optional — what's it about? (leave blank to just ring)","");
+  if(note===null)return;
+  const ref=db.ref("calls").push({
+    from:me().user,to,ts:Date.now(),status:"ringing",note:(note||"").trim()
+  });
+  activeCall={id:ref.key,role:"caller",to};
+  showCallUI("caller",{from:me().user,to,note:(note||"").trim()});
+  setTimeout(()=>{
+    if(activeCall&&activeCall.id===ref.key){
+      db.ref("calls/"+ref.key).update({status:"missed"});
+      endCallUI("No answer");
+    }
+  },RING_SECONDS*1000);
+}
+function handleCalls(){
+  const m=me().user; if(!m)return;
+  const now=Date.now();
+  // incoming ring for me
+  const inc=calls.find(c=>c.to===m&&c.status==="ringing"&&(now-c.ts)<RING_SECONDS*1000);
+  if(inc&&(!activeCall||activeCall.id!==inc.id)){
+    activeCall={id:inc.id,role:"receiver",from:inc.from};
+    showCallUI("receiver",inc);
+    if(!dnd)startRinging(inc.from,m);
+    if(navigator.vibrate)try{navigator.vibrate([400,200,400,200,400]);}catch(e){}
+    setTimeout(()=>{ if(activeCall&&activeCall.id===inc.id){
+      db.ref("calls/"+inc.id).update({status:"missed"}); endCallUI("Missed call"); } },RING_SECONDS*1000);
+  }
+  // my active call changed state elsewhere
+  if(activeCall){
+    const c=calls.find(x=>x.id===activeCall.id);
+    if(!c){endCallUI("Call ended");return;}
+    if(c.status==="answered"&&activeCall.role==="caller"){stopRinging();updateCallUI("connected",c);}
+    if(c.status==="declined")endCallUI(activeCall.role==="caller"?"Call declined":"Declined");
+    if(c.status==="cancelled")endCallUI("Caller hung up");
+    if(c.status==="ended")endCallUI("Call ended");
+  }
+  // missed-call note for me
+  calls.filter(c=>c.to===m&&c.status==="missed").forEach(c=>{
+    const k="odea_missed_"+c.id;
+    if(localStorage.getItem(k))return;
+    localStorage.setItem(k,"1");
+    popAlert("task","📞 Missed call",displayName(c.from)+(c.note?" · "+c.note:""),c.from,"mc_"+c.id);
+  });
+}
+
+/* ---------- ring sound: two-tone chime + spoken name ---------- */
+function startRinging(fromUser,toUser){
+  stopRinging();
+  try{
+    ringCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(ringCtx.state==="suspended")ringCtx.resume();
+  }catch(e){ringCtx=null;}
+  const speakLine=()=>{
+    if(!("speechSynthesis" in window))return;
+    const line=firstName(toUser)+", "+firstName(fromUser)+" is calling you";
+    const u=new SpeechSynthesisUtterance(line);
+    u.rate=.95; u.pitch=1.03; u.volume=1;
+    const vs=speechSynthesis.getVoices();
+    const pick=vs.find(v=>/en-IN/i.test(v.lang))||vs.find(v=>/en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang));
+    if(pick)u.voice=pick;
+    try{speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
+  };
+  const cycle=()=>{ chime(); setTimeout(speakLine,900); };
+  cycle();
+  ringTimer=setInterval(cycle,4200);
+  ringStop=setTimeout(stopRinging,RING_SECONDS*1000);
+}
+function chime(){                       // soft professional two-note tone
+  if(!ringCtx)return;
+  const notes=[[880,0],[1174,.22],[880,.62],[1174,.84]];
+  notes.forEach(([f,t])=>{
+    const o=ringCtx.createOscillator(),g=ringCtx.createGain();
+    o.type="sine"; o.frequency.value=f;
+    const s=ringCtx.currentTime+t;
+    g.gain.setValueAtTime(0,s);
+    g.gain.linearRampToValueAtTime(.22,s+.03);
+    g.gain.exponentialRampToValueAtTime(.001,s+.35);
+    o.connect(g).connect(ringCtx.destination);
+    o.start(s); o.stop(s+.4);
+  });
+  // warm pad underneath
+  const p=ringCtx.createOscillator(),pg=ringCtx.createGain();
+  p.type="triangle"; p.frequency.value=220;
+  const s=ringCtx.currentTime;
+  pg.gain.setValueAtTime(0,s);
+  pg.gain.linearRampToValueAtTime(.06,s+.15);
+  pg.gain.exponentialRampToValueAtTime(.001,s+1.3);
+  p.connect(pg).connect(ringCtx.destination);
+  p.start(s); p.stop(s+1.4);
+}
+function stopRinging(){
+  clearInterval(ringTimer); clearTimeout(ringStop); ringTimer=ringStop=null;
+  if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch(e){}
+  if(ringCtx){try{ringCtx.close();}catch(e){} ringCtx=null;}
+  if(navigator.vibrate)try{navigator.vibrate(0);}catch(e){}
+}
+function firstName(u){
+  const r=userRec(u);
+  return String(r.name||cap(u)).trim().split(/\s+/)[0];
+}
+
+/* ---------- call UI ---------- */
+function showCallUI(role,c){
+  const other=role==="caller"?c.to:c.from;
+  $("callBox").innerHTML=`
+    <div class="call-rings"><span></span><span></span><span></span></div>
+    <div class="call-face">${avatarHTML(other,110)}</div>
+    <h3>${esc(displayName(other))}</h3>
+    <div class="call-sub" id="callSub">${role==="caller"?"Ringing…":"is calling you"}</div>
+    ${c.note?`<div class="call-note">💬 ${esc(c.note)}</div>`:""}
+    <div class="call-timer" id="callTimer">${RING_SECONDS}s</div>
+    <div class="call-actions">
+      ${role==="receiver"?`
+        <button class="btn call-act decline" onclick="declineCall()">✕<small>Decline</small></button>
+        <button class="btn call-act accept" onclick="answerCall()">✓<small>Answer</small></button>`
+      :`<button class="btn call-act decline" onclick="cancelCall()">✕<small>Cancel</small></button>`}
+    </div>`;
+  openModal("callModal");
+  let left=RING_SECONDS;
+  activeCall._tick=setInterval(()=>{
+    left--; const t=$("callTimer");
+    if(t)t.textContent=left>0?left+"s":"";
+    if(left<=0)clearInterval(activeCall._tick);
+  },1000);
+}
+function updateCallUI(state,c){
+  const sub=$("callSub"); if(sub)sub.textContent="Connected — go talk to them 🎉";
+  const t=$("callTimer"); if(t)t.textContent="";
+  $("callBox").querySelector(".call-actions").innerHTML=
+    `<button class="btn call-act decline" onclick="hangUp()">✕<small>End</small></button>`;
+  $("callBox").classList.add("connected");
+}
+function answerCall(){
+  if(!activeCall)return;
+  stopRinging();
+  db.ref("calls/"+activeCall.id).update({status:"answered",answeredAt:Date.now()});
+  updateCallUI("connected");
+  toast("Answered — they've been told 👍");
+  setTimeout(()=>{ if(activeCall)hangUp(); },4000);
+}
+function declineCall(){
+  if(!activeCall)return;
+  stopRinging();
+  db.ref("calls/"+activeCall.id).update({status:"declined"});
+  endCallUI("Declined");
+}
+function cancelCall(){
+  if(!activeCall)return;
+  db.ref("calls/"+activeCall.id).update({status:"cancelled"});
+  endCallUI("Cancelled");
+}
+function hangUp(){
+  if(!activeCall)return;
+  db.ref("calls/"+activeCall.id).update({status:"ended"});
+  endCallUI("Call ended");
+}
+function endCallUI(msg){
+  stopRinging();
+  if(activeCall&&activeCall._tick)clearInterval(activeCall._tick);
+  activeCall=null;
+  closeModal("callModal");
+  $("callBox").classList.remove("connected");
+  if(msg)toast(msg);
+}
+/* tidy old call records once a day */
+function purgeCalls(){
+  if(!cloudOn||!isAdminNow())return;
+  const cut=Date.now()-24*60*60*1000;
+  calls.filter(c=>c.ts<cut).forEach(c=>db.ref("calls/"+c.id).remove());
+}
+setTimeout(purgeCalls,20000);
