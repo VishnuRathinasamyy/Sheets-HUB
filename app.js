@@ -1554,9 +1554,21 @@ function toggleDnd(){
   toast(dnd?"Do not disturb ON — calls stay silent":"Do not disturb OFF");
   if(currentView==="board")renderBoard();
 }
+function isBusy(u){
+  const now=Date.now();
+  return calls.some(c=>
+    (c.from===u||c.to===u) &&
+    (c.status==="ringing"||c.status==="answered") &&
+    (now-c.ts)<RING_SECONDS*1000
+  );
+}
 function startCall(to){
   if(!cloudOn)return;
-  if(activeCall){toast("Finish the current call first");return;}
+  if(activeCall){toast("You're already on a call");return;}
+  if(isBusy(to)){
+    popAlert("rejected","📞 Line busy",displayName(to)+" is on another call — try again shortly",to,"busy_"+to+"_"+Date.now());
+    return;
+  }
   const note=prompt("Optional — what's it about? (leave blank to just ring)","");
   if(note===null)return;
   const ref=db.ref("calls").push({
@@ -1575,7 +1587,12 @@ function handleCalls(){
   const m=me().user; if(!m)return;
   const now=Date.now();
   // incoming ring for me
-  const inc=calls.find(c=>c.to===m&&c.status==="ringing"&&(now-c.ts)<RING_SECONDS*1000);
+    const inc=calls.find(c=>c.to===m&&c.status==="ringing"&&(now-c.ts)<RING_SECONDS*1000);
+  // already on a call? tell the new caller the line is busy
+  if(inc&&activeCall&&activeCall.id!==inc.id){
+    db.ref("calls/"+inc.id).update({status:"busy"});
+    return;
+  }
   if(inc&&(!activeCall||activeCall.id!==inc.id)){
     activeCall={id:inc.id,role:"receiver",from:inc.from};
     showCallUI("receiver",inc);
@@ -1589,12 +1606,17 @@ function handleCalls(){
     const c=calls.find(x=>x.id===activeCall.id);
     if(!c){endCallUI("Call ended");return;}
     if(c.status==="answered"&&activeCall.role==="caller"){stopRinging();updateCallUI("connected",c);}
-    if(c.status==="declined")endCallUI(activeCall.role==="caller"?"Call declined":"Declined");
+        if(c.status==="declined")endCallUI(activeCall.role==="caller"?"Call declined":"Declined");
+    if(c.status==="busy"){
+      const who=displayName(c.to);
+      endCallUI(null);
+      popAlert("rejected","📞 Line busy",who+" is on another call",c.to,"busy2_"+c.id);
+    }
     if(c.status==="cancelled")endCallUI("Caller hung up");
     if(c.status==="ended")endCallUI("Call ended");
   }
   // missed-call note for me
-  calls.filter(c=>c.to===m&&c.status==="missed").forEach(c=>{
+    calls.filter(c=>c.to===m&&(c.status==="missed"||c.status==="busy")).forEach(c=>{
     const k="odea_missed_"+c.id;
     if(localStorage.getItem(k))return;
     localStorage.setItem(k,"1");
