@@ -3,7 +3,7 @@
    ⚙️ SETTINGS — the only things you ever edit in code:
 ===================================================================== */
 const USERS = [
-  { user: "Deepika Sampath", pass: "Odea2026", role: "admin", team: "Admin", name: "Master Admin" },
+  { user: "admin", pass: "Odea2026", role: "admin", team: "Admin", name: "Deepika Sampath" },
 ];
 
 const FIREBASE_CONFIG = {
