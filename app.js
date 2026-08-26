@@ -97,7 +97,7 @@ function bootCloud(){
     db.ref("users").on("value",s=>{const v=s.val()||{};
       cloudUsers=Object.keys(v).map(k=>({user:k,...v[k]}));
       if($("usersModal").classList.contains("on"))renderUsers();
-      if(currentView==="board")renderBoard();
+      if(currentView==="board")renderBoard(); else if(currentView==="myday")renderMyDay();
       refreshMyChip();});
     db.ref("revoked").on("value",s=>{
       const v=s.val()||{}, m=session();
@@ -121,17 +121,20 @@ function bootCloud(){
       teams=Object.keys(v).map(k=>({id:k,name:v[k].name}));
       if(!teams.length&&isAdminNow())seedTeams();
       renderTeamDependents();});
-    db.ref("entries").on("value",s=>{const v=s.val()||{};
+        db.ref("entries").on("value",s=>{const v=s.val()||{};
       entries=Object.keys(v).map(k=>({id:k,...v[k]}));
-      if(currentView==="board")renderBoard();});
+      if(currentView==="board")renderBoard();
+      else if(currentView==="myday")renderMyDay();});
     db.ref("tasks").on("value",s=>{const v=s.val()||{};
       tasks=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
       updateTaskBadge();
-      if($("tasksModal").classList.contains("on"))renderTasks();});
+      if($("tasksModal").classList.contains("on"))renderTasks();
+      if(currentView==="myday")renderMyDay();});
     db.ref("approvals").on("value",s=>{const v=s.val()||{};
       approvals=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
       updateApprBadge(); notifyCheck();
-      if($("apprModal").classList.contains("on"))renderApprovals();});
+      if($("apprModal").classList.contains("on"))renderApprovals();
+      if(currentView==="myday")renderMyDay();});
         db.ref("calls").on("value",s=>{const v=s.val()||{};
       calls=Object.keys(v).map(k=>({id:k,...v[k]}));
       handleCalls();});
@@ -188,9 +191,11 @@ function enterApp(){
   $("addBtn").style.display=a?"":"none";
   $("newFolderBtn")&&($("newFolderBtn").style.display=a?"":"none");
   $("boardBtn")&&($("boardBtn").style.display=co?"none":"");
+  $("mydayBtn")&&($("mydayBtn").style.display=co?"none":"");
   $("apprBtn")&&($("apprBtn").style.display=co?"none":"");
   $("archBtn")&&($("archBtn").style.display=co?"none":"");
-  showWelcome(); renderFolders(); updateTaskBadge();
+  isCoordinator()?showWelcome():showMyDay();
+  renderFolders(); updateTaskBadge();
     askNotifyPermission();
   bootDigest();
   if("speechSynthesis" in window)speechSynthesis.getVoices();   // warm up voices
@@ -227,10 +232,13 @@ function toggleSide(force){
   if(window.innerWidth<=860&&$("burgerBtn"))$("burgerBtn").textContent=on?"✕":"☰";
 }
 
-function myTeams(u){                     // works with old single team + new list
-  const r=u?userRec(u):me();
+function myTeams(u){                     // always read live data, not the frozen session
+  const key=u||me().user;
+  const r=userRec(key);
   if(r.teams)return Object.keys(r.teams);
-  return r.team?[r.team]:[];
+  if(r.team)return [r.team];
+  const s=me();                          // fallback for the master admin
+  return (!u&&s.team)?[s.team]:[];
 }
 function pickedUserTeams(){
   const out={};
@@ -243,6 +251,7 @@ function extractId(url){const m=String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-
 function canSee(s){
   if(isCoordinator())return false;          // coordinators see no sheets
   if(isAdminNow())return true;
+  if(s.users&&s.users[me().user])return true;   // named individually
   const t=s.teams;
   if(!t||t.All)return true;
   return myTeams().some(x=>t[x]);
@@ -255,6 +264,9 @@ function renderTeamDependents(){
     teamNames().map(n=>`<label class="check-pill"><input type="checkbox" value="${esc(n)}"> ${esc(n)}</label>`).join("");}
   const tk=$("nuTeamChecks");
   if(tk)tk.innerHTML=teamNames().map(n=>`<label class="check-pill"><input type="checkbox" value="${esc(n)}"> ${esc(n)}</label>`).join("");
+    const su=$("sheetUserChecks");
+  if(su)su.innerHTML=allUsers().filter(u=>u.role!=="coordinator")
+    .map(u=>`<label class="check-pill"><input type="checkbox" value="${esc(u.user)}"> ${esc(u.name||cap(u.user))}</label>`).join("");
   const chips=$("teamChips");
   if(chips)chips.innerHTML=teams.map(t=>`<span class="team-chip">${esc(t.name)}<button onclick="delTeam('${t.id}')" title="Remove">✕</button></span>`).join("")||'<small style="color:var(--cream-dim)">No teams yet</small>';
 }
@@ -266,6 +278,18 @@ function pickedTeams(){
   $("teamChecks").querySelectorAll("input:checked").forEach(i=>out[i.value]=true);
   return Object.keys(out).length?out:{All:true};
 }
+function pickedSheetUsers(){
+  const out={};
+  const el=$("sheetUserChecks");
+  if(el)el.querySelectorAll("input:checked").forEach(i=>out[i.value]=true);
+  return out;
+}
+function accessLabel(s){
+  const t=(s.teams&&!s.teams.All)?Object.keys(s.teams):[];
+  const u=s.users?Object.keys(s.users).map(displayName):[];
+  if(!t.length&&!u.length)return "All teams";
+  return esc([...t,...u].join(", "));
+}
 
 function openAddSheet(){
   editingSheetId=null;
@@ -274,6 +298,7 @@ function openAddSheet(){
   $("sheetName").value=$("sheetUrl").value=$("sheetIcon").value="";
   renderTeamDependents();
   renderFolderSelect(); $("sheetFolder").value="";
+  $("sheetUserChecks")&&$("sheetUserChecks").querySelectorAll("input").forEach(i=>i.checked=false);
   openModal("addModal");
 }
 function editSheet(ev,id){
@@ -289,6 +314,8 @@ function editSheet(ev,id){
   const t=s.teams||{All:true};
   $("teamChecks").querySelectorAll("input").forEach(i=>i.checked=!!t[i.value]);
   renderFolderSelect(); $("sheetFolder").value=s.folder||"";
+  const su=s.users||{};
+  $("sheetUserChecks")&&$("sheetUserChecks").querySelectorAll("input").forEach(i=>i.checked=!!su[i.value]);
   openModal("addModal");
 }
 function saveSheet(){
@@ -298,7 +325,7 @@ function saveSheet(){
   if(!name){toast("Give the sheet a display name");return;}
   const gid=extractId(url);
   if(!gid){toast("That doesn't look like a Google Sheets link");return;}
-  const data={name,gid,icon,teams:pickedTeams(),folder:$("sheetFolder").value||""};
+    const data={name,gid,icon,teams:pickedTeams(),users:pickedSheetUsers(),folder:$("sheetFolder").value||""};
   if(!cloudOn){toast("Cloud not connected");return;}
   if(editingSheetId){db.ref("sheets/"+editingSheetId).update(data).then(()=>toast("Sheet updated ✓"));}
   else{data.ts=Date.now();db.ref("sheets").push(data).then(()=>toast("“"+name+"” added ✓"));}
@@ -379,7 +406,7 @@ function renderFolders(){
   const row=s=>`
     <div class="folder subsheet ${s.id===activeId?"active":""}" data-id="${s.id}" onclick="openSheet('${s.id}')" oncontextmenu="showCtx(event,'${s.id}')">
       <div class="folder-ico">${s.icon||"📄"}</div>
-      <div class="folder-meta"><b>${esc(s.name)}</b><small>${s.teams&&!s.teams.All?esc(Object.keys(s.teams).join(", ")):"All teams"}</small></div>
+      <div class="folder-meta"><b>${esc(s.name)}</b><small>${accessLabel(s)}</small></div>
       <button class="btn folder-edit pin-btn ${isPinned(s.id)?"on":""}" title="${isPinned(s.id)?"Unpin":"Pin to top"}" onclick="togglePin(event,'${s.id}')">${isPinned(s.id)?"★":"☆"}</button>
       ${admin?`<button class="btn folder-edit" title="Edit" onclick="editSheet(event,'${s.id}')">✏️</button><button class="btn folder-del" title="Remove" onclick="delSheet(event,'${s.id}')">✕</button>`:""}
     </div>`;
@@ -538,6 +565,7 @@ function renderBoard(){
     <div class="board">
       <div class="board-head">
         <h3>To-Do / <em>EOD</em> Board</h3>
+        <button class="btn md-jump" onclick="showMyDay()">☀️ My Day</button>
         <span class="board-date">${niceDate()}</span>
       </div>
       <div class="legend" style="margin-bottom:14px">
@@ -801,6 +829,8 @@ function notifyCheck(){
   approvals.filter(a=>isApprover(a)&&a.status!=="pending").forEach(a=>
     add("ax_"+a.id,a.status==="approved"?"approved":"rejected",
         a.status==="approved"?"You approved ✓":"Sent back ✎",a.title));
+  approvals.filter(a=>a.by===m&&a.status==="pending"&&a.undoneAt)
+    .forEach(a=>add("un_"+a.id+a.undoneAt,"rejected","Decision undone",a.title+" — back to pending",a.undoneBy));
 
   markSeen(seen);
   if(!_notifyReady){ _notifyReady=true; return; }
@@ -813,6 +843,8 @@ function activeAlerts(){
   const cut=Date.now()-HIDE_AFTER, out=[];
   myOpenTasks().forEach(t=>out.push({kind:"task",text:"Task",sub:t.title,ts:t.ts||0,from:t.by}));
   pendingForMe().forEach(a=>out.push({kind:"approval",text:"Approval needed",sub:a.title,ts:a.ts||0,from:a.by}));
+  approvals.filter(a=>a.by===m&&a.status==="pending"&&a.undoneAt&&(Date.now()-a.undoneAt)<HIDE_AFTER)
+    .forEach(a=>out.push({kind:"rejected",text:"Decision undone",sub:a.title+" — back to pending",ts:a.undoneAt,from:a.undoneBy}));
   approvals.filter(a=>a.by===m&&a.status==="approved"&&(a.decidedAt||0)>cut)
     .forEach(a=>out.push({kind:"approved",text:"Approved",sub:a.title,ts:a.decidedAt,from:a.decidedBy}));
   approvals.filter(a=>a.by===m&&a.status==="rejected"&&(a.decidedAt||0)>cut)
@@ -1060,6 +1092,23 @@ function reopenAppr(id){
   db.ref("approvals/"+id).update({status:"pending",decidedBy:null,decidedAt:null,reason:null})
     .then(()=>toast("Resubmitted for approval ✓"));
 }
+const UNDO_WINDOW=15*60*1000;   // 15 minutes to undo a decision
+function canUndo(a){
+  return a.status!=="pending" && a.decidedBy===me().user &&
+         (Date.now()-(a.decidedAt||0))<UNDO_WINDOW;
+}
+function undoDecision(id){
+  const a=approvals.find(x=>x.id===id);if(!a)return;
+  if(!canUndo(a)&&!isAdminNow()){toast("The undo window has passed");return;}
+  askConfirm("Undo this decision?",
+    "It goes back to pending and "+displayName(a.by)+" will be notified again.",
+    ()=>{
+      db.ref("approvals/"+id).update({
+        status:"pending",decidedBy:null,decidedAt:null,reason:null,
+        undoneBy:me().user,undoneAt:Date.now()
+      }).then(()=>toast("Decision undone — back to pending ✓"));
+    },"Yes, undo");
+}
 function delApproval(id){
   const a=approvals.find(x=>x.id===id);if(!a)return;
   if(!isAdminNow()&&a.by!==me().user)return;
@@ -1094,15 +1143,17 @@ function renderApprovals(){
         <b>${esc(a.title)}</b>
       </div>
       <div class="task-meta">From ${esc(displayName(a.by))} · To ${esc(who)} · ${new Date(a.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
-        ${a.decidedAt?` · by ${esc(displayName(a.decidedBy))} · hides in ${left}h`:""}</div>
+      ${a.decidedAt?` · by ${esc(displayName(a.decidedBy))} · hides in ${left}h`:""}
+      ${a.undoneBy&&a.status==="pending"?` · <span style="color:var(--gold)">↩ undone by ${esc(displayName(a.undoneBy))}</span>`:""}</div>
       ${a.body?`<div class="task-body">${sanitize(a.body)}</div>`:""}
       ${a.link?`<a class="appr-link" href="${esc(a.link)}" target="_blank">🔗 Open attachment</a>`:""}
       ${a.reason?`<div class="appr-reason">✎ ${esc(a.reason)}
         ${(a.decidedBy===m||isAdminNow())?`<button class="btn tiny-btn" title="Edit message" onclick="editReason('${a.id}')">✏️</button>`:""}</div>`:""}
       <div class="task-actions">
         ${canApprove?`<button class="btn chip-btn ok" onclick="approveIt('${a.id}')">✓ Approve</button>
-                      <button class="btn chip-btn danger" onclick="rejectIt('${a.id}')">✕ Needs correction</button>`:""}
+        <button class="btn chip-btn danger" onclick="rejectIt('${a.id}')">✕ Needs correction</button>`:""}
         ${(mineReq&&a.status==="rejected")?`<button class="btn chip-btn" onclick="reopenAppr('${a.id}')">↻ Resubmit</button>`:""}
+        ${(canUndo(a)||(isAdminNow()&&a.status!=="pending"))?`<button class="btn chip-btn undo-btn" onclick="undoDecision('${a.id}')">↩ Undo${canUndo(a)?" ("+Math.max(1,Math.ceil((UNDO_WINDOW-(Date.now()-(a.decidedAt||0)))/60000))+"m)":""}</button>`:""}
         <button class="btn chip-btn" onclick="toggleApprReply('${a.id}')">💬 Reply${reps.length?" ("+reps.length+")":""}</button>
         ${(mineReq||isAdminNow())?`<button class="btn chip-btn" onclick="delApproval('${a.id}')">Delete</button>`:""}
       </div>
@@ -1750,3 +1801,148 @@ function purgeCalls(){
   calls.filter(c=>c.ts<cut).forEach(c=>db.ref("calls/"+c.id).remove());
 }
 setTimeout(purgeCalls,20000);
+
+
+
+
+/* ================= MY DAY ================= */
+function greetWord(){
+  const h=hourIST();
+  return h<12?"Good morning":h<17?"Good afternoon":"Good evening";
+}
+function timeAgo(ts){
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return "now";
+  if(s<3600)return Math.floor(s/60)+"m";
+  if(s<86400)return Math.floor(s/3600)+"h";
+  return Math.floor(s/86400)+"d";
+}
+function showMyDay(){
+  if(isCoordinator())return;
+  currentView="myday";activeId=null;renderFolders();toggleSide(false);
+  $("stageTitle").innerHTML=`<span class="live-dot"></span>My Day`;
+  $("openExt").style.display="none";
+  renderMyDay();
+}
+function renderMyDay(){
+  if(currentView!=="myday")return;
+  const m=me().user, r=userRec(m);
+  const draft=$("in_"+m)?$("in_"+m).value:"";
+  const wrap=$("stage").querySelector(".myday");
+  const sy=wrap?wrap.scrollTop:0;
+  const wasFocused=document.activeElement&&document.activeElement.id==="in_"+m;
+  const mine=entries.filter(e=>e.user===m).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const done=mine.filter(e=>e.status==="done").length;
+  const prog=mine.filter(e=>e.status==="progress").length;
+  const pend=mine.filter(e=>e.status==="pending").length;
+  const total=mine.length;
+  const pct=total?Math.round(done*100/total):0;
+  const carried=mine.filter(e=>(e.days||1)>1).length;
+
+  const myTasks=tasks.filter(t=>t.status==="open"&&t.to&&
+    ((t.to.users&&t.to.users[m])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
+  const sentTasks=tasks.filter(t=>t.by===m&&t.status==="open");
+  const toApprove=pendingForMe();
+  const myReqs=liveApprovals().filter(a=>a.by===m&&a.status!=="approved");
+
+  const entryRow=e=>`
+    <div class="entry md-entry">
+      <span class="status-chip ${e.status||"pending"}" title="Tap to change" onclick="cycleStatus('${e.id}')"></span>
+      <div class="txt ${e.status==="done"?"done":""}">${esc(e.text)}${(e.days||1)>1?` <small style="color:var(--gold)">(Day ${e.days})</small>`:""}</div>
+      ${canDeleteEntry(e)?`<button class="btn entry-edit" title="Edit" onclick="editEntry('${e.id}')">✏️</button><button class="btn entry-del" onclick="delEntry('${e.id}')">✕</button>`:""}
+    </div>`;
+  const taskRow=(t,sent)=>{
+    const age=Math.floor((Date.now()-(t.ts||Date.now()))/86400000);
+    const who=sent?namesOf(t.to):displayName(t.by);
+    return `<div class="md-item">
+      <div class="md-item-top"><b>${esc(t.title)}</b>
+        ${age>2?`<span class="md-age ${age>6?"hot":""}">${age}d</span>`:""}</div>
+      <small>${sent?"To":"From"} ${esc(who)}</small>
+      <div class="md-item-act">
+        ${!sent?`<button class="btn chip-btn ok" onclick="doneTask('${t.id}')">✓ Done</button>`:""}
+        <button class="btn chip-btn" onclick="openTasks()">Open</button>
+      </div></div>`;
+  };
+  const apprRow=(a,mineReq)=>{
+    const age=Math.floor((Date.now()-(a.ts||Date.now()))/86400000);
+    return `<div class="md-item ${a.status==="rejected"?"bad":""}">
+      <div class="md-item-top"><b>${esc(a.title)}</b>
+        ${a.priority==="high"?`<span class="pri high">HIGH</span>`:""}
+        ${age>2?`<span class="md-age ${age>6?"hot":""}">${age}d</span>`:""}</div>
+      <small>${mineReq?"Waiting on "+esc(namesOf(a.to)):"From "+esc(displayName(a.by))}${a.status==="rejected"?" · needs correction":""}</small>
+      <div class="md-item-act">
+        ${!mineReq?`<button class="btn chip-btn ok" onclick="approveIt('${a.id}')">✓ Approve</button>
+                    <button class="btn chip-btn danger" onclick="rejectIt('${a.id}')">✕ Correct</button>`:""}
+        <button class="btn chip-btn" onclick="openApprovals()">Open</button>
+      </div></div>`;
+  };
+  const notes=activeAlerts().slice(0,8);
+  const noteRow=n=>`
+    <div class="md-note" onclick="${n.kind==="approval"||n.kind==="approved"||n.kind==="rejected"?"openApprovals()":"openTasks()"}">
+      <div class="md-note-ico ${ALERT_STYLE[n.kind]?ALERT_STYLE[n.kind].cls:"n-task"}">${ALERT_STYLE[n.kind]?ALERT_STYLE[n.kind].ico:"🔔"}</div>
+      <div class="md-note-txt"><b>${esc(n.text)}</b><small>${esc(n.sub||"")}</small></div>
+      <span class="md-note-time">${n.ts?timeAgo(n.ts):""}</span>
+    </div>`;
+  const bdays=allUsers().filter(u=>isBirthdayToday(u.dob));
+
+  $("stage").innerHTML=`
+  <div class="myday">
+    <div class="md-hero">
+      <div class="md-hero-l">
+        ${avatarHTML(m,64)}
+        <div><h2>${greetWord()}, <em>${esc(displayName(m))}</em></h2>
+        <span class="md-date">${niceDate()}${r.title?" · "+esc(r.title):""}</span></div>
+      </div>
+      <div class="md-ring" style="--p:${pct}">
+        <svg viewBox="0 0 44 44"><circle class="rb" cx="22" cy="22" r="19"/><circle class="rf" cx="22" cy="22" r="19"/></svg>
+        <b>${pct}<i>%</i></b>
+      </div>
+    </div>
+    ${bdays.length?`<div class="md-bday">🎂 It's ${bdays.map(b=>esc(displayName(b.user))).join(" & ")}'s birthday today — send your wishes! 🎀</div>`:""}
+    ${carried?`<div class="md-warn">⏳ ${carried} item${carried>1?"s":""} carried from earlier — try to close ${carried>1?"them":"it"} today</div>`:""}
+    <div class="md-stats">
+      <div class="md-stat"><b>${total}</b><small>Today</small></div>
+      <div class="md-stat ok"><b>${done}</b><small>Done</small></div>
+      <div class="md-stat warn"><b>${prog}</b><small>In progress</small></div>
+      <div class="md-stat bad"><b>${pend}</b><small>Pending</small></div>
+      <div class="md-stat"><b>${myTasks.length}</b><small>Tasks</small></div>
+      <div class="md-stat"><b>${toApprove.length}</b><small>To approve</small></div>
+    </div>
+    <div class="md-grid">
+      <section class="md-panel md-wide">
+        <h3>📋 My To-Do / EOD <span class="md-count">${total}</span></h3>
+        <div class="md-addrow">
+          <input id="in_${esc(m)}" placeholder="Add something for today…" onkeydown="if(event.key==='Enter')addEntry('${esc(m)}')">
+          <button class="btn mini-add todo" onclick="addEntry('${esc(m)}')">ADD</button>
+        </div>
+        <div class="md-list">${mine.map(entryRow).join("")||'<div class="mc-empty">Nothing yet — add your first item above</div>'}</div>
+      </section>
+      <section class="md-panel">
+        <h3>🔔 Tasks for me <span class="md-count">${myTasks.length}</span></h3>
+        <div class="md-list">${myTasks.map(t=>taskRow(t,false)).join("")||'<div class="mc-empty">All clear 🎉</div>'}</div>
+        ${sentTasks.length?`<h4 class="md-sub">Assigned by me (${sentTasks.length})</h4>
+          <div class="md-list">${sentTasks.slice(0,4).map(t=>taskRow(t,true)).join("")}</div>`:""}
+      </section>
+      <section class="md-panel">
+        <h3>✅ Approvals <span class="md-count">${toApprove.length+myReqs.length}</span></h3>
+        ${toApprove.length?`<h4 class="md-sub">Waiting on me</h4><div class="md-list">${toApprove.map(a=>apprRow(a,false)).join("")}</div>`:""}
+        ${myReqs.length?`<h4 class="md-sub">My requests</h4><div class="md-list">${myReqs.map(a=>apprRow(a,true)).join("")}</div>`:""}
+        ${!toApprove.length&&!myReqs.length?'<div class="mc-empty">Nothing pending 🎉</div>':""}
+      </section>
+      <section class="md-panel md-wide">
+        <h3>🔕 Recent activity <span class="md-count">${notes.length}</span></h3>
+        <div class="md-notes">${notes.map(noteRow).join("")||'<div class="mc-empty">Nothing new</div>'}</div>
+      </section>
+    </div>
+    <div class="md-quick">
+      <button class="btn ghost-btn" onclick="showBoard()">👥 Team board</button>
+      <button class="btn ghost-btn" onclick="openCompose()">➕ Assign task</button>
+      <button class="btn ghost-btn" onclick="openApprCompose()">📤 Request approval</button>
+      <button class="btn ghost-btn" onclick="openArchiveData()">🗄️ Archive</button>
+    </div>
+  </div>`;
+  if(draft&&$("in_"+m))$("in_"+m).value=draft;
+  const nw=$("stage").querySelector(".myday");
+  if(nw&&sy)nw.scrollTop=sy;
+  if(wasFocused&&$("in_"+m))$("in_"+m).focus();
+}
