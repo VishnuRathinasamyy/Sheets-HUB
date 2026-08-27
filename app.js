@@ -1484,7 +1484,7 @@ function showIdCard(user){
     <div class="id-grid">
       ${cell("ID",empId(user))}
       ${cell("Blood",r.blood)}
-      ${cell("Born",r.dob?new Date(r.dob).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(age?" · "+age:""):"")}
+      ${cell("Born",r.dob?new Date(r.dob).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"")}
       ${cell("Tenure",ten)}
       ${cell("Phone",r.phone)}
       ${cell("Email",r.email)}
