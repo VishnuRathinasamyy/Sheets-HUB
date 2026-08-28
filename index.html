@@ -75,6 +75,7 @@
     <div class="topbar">
       <button class="btn burger" id="burgerBtn" onclick="smartToggle()">◀</button>
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
+            <button class="btn top-btn" id="mdlBtn" onclick="openMissed()" style="background:linear-gradient(120deg,#E85A4F,#A32A20);border-color:transparent;color:#fff;font-weight:700">⏱️ <span class="lbl">Missed Deadlines</span></button>
       <button class="btn top-btn" id="archBtn" onclick="openArchiveData()">🗄️ <span class="lbl">Archive</span></button>
       <button class="btn top-btn" id="mydayBtn" onclick="showMyDay()" style="background:linear-gradient(120deg,#7A5CE0,#4B2FA8);border-color:transparent;color:#fff;font-weight:700">☀️ <span class="lbl">My Day</span></button>
       <button class="btn top-btn" id="boardBtn" onclick="showBoard()" style="background:linear-gradient(120deg,#E85A4F,#FF3B30);border-color:transparent;color:#fff;font-weight:700;box-shadow:0 6px 16px rgba(232,90,79,.4)">📋 <span class="lbl">To-Do / EOD</span></button>
@@ -186,6 +187,14 @@
     <div class="mc-addrow" style="margin-bottom:4px">
       <input id="newTeamName" placeholder="New team name">
       <button class="btn mini-add todo" onclick="addTeam()">ADD</button>
+    </div>
+        <div class="divider"></div>
+    <h3 style="font-size:17px">Clients / projects</h3>
+    <p class="m-sub">Used in Missed Deadlines and anywhere a client is picked. Keeping this list clean keeps your reports accurate.</p>
+    <div class="team-chip-row" id="clientChips"></div>
+    <div class="mc-addrow" style="margin-bottom:4px">
+      <input id="newClientName" placeholder="New client name">
+      <button class="btn mini-add todo" onclick="addClient()">ADD</button>
     </div>
     <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('settingsModal')">Close</button></div>
   </div>
@@ -329,6 +338,25 @@
 
 <div class="overlay call-overlay" id="callModal">
   <div class="call-box" id="callBox"></div>
+</div>
+
+<div class="overlay" id="mdlModal">
+  <div class="modal arch-modal">
+    <div class="arch-head">
+      <div><h3>Missed Deadlines</h3>
+        <p class="m-sub" style="margin:0" id="mdlSub">Log what slipped, why, and how it was recovered.</p></div>
+      <button class="btn btn-cancel arch-x" onclick="closeModal('mdlModal')">✕</button>
+    </div>
+    <div class="arch-bar">
+      <div class="arch-tabs">
+        <button class="btn arch-tab on" data-m="today" onclick="setMdlTab('today')">📝 Log today</button>
+        <button class="btn arch-tab" data-m="all" onclick="setMdlTab('all')">📚 History</button>
+        <button class="btn arch-tab" data-m="stats" onclick="setMdlTab('stats')">📊 Insights</button>
+      </div>
+      <div class="arch-tools" id="mdlTools"></div>
+    </div>
+    <div id="mdlBody"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

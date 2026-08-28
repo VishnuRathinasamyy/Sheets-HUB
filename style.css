@@ -819,3 +819,20 @@ body.light *{scrollbar-color:rgba(241,90,34,.45) transparent}
 
 .chip-btn.undo-btn{background:rgba(232,180,74,.15);border-color:rgba(232,180,74,.5);color:var(--gold)}
 .chip-btn.undo-btn:hover{background:rgba(232,180,74,.3);color:#fff}
+
+
+
+/* ---------- missed deadlines ---------- */
+.mdl-form{padding:4px 2px}
+.mdl-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.mdl-row{grid-template-columns:1fr}}
+.mdl-form textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--glass-border);
+  background:var(--input-bg);color:var(--cream);font:500 14px var(--font-ui);outline:none;resize:vertical}
+.mdl-form textarea:focus{border-color:var(--glass-border-hot)}
+.sev{padding:3px 10px;border-radius:99px;font-size:9.5px;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+.sev.low{background:var(--glass-strong);border:1px solid var(--glass-border);color:var(--cream-dim)}
+.sev.medium{background:rgba(232,180,74,.18);border:1px solid rgba(232,180,74,.5);color:var(--gold)}
+.sev.high{background:rgba(255,115,0,.2);border:1px solid rgba(255,115,0,.55);color:#FF9A50}
+.sev.critical{background:rgba(232,90,79,.22);border:1px solid rgba(232,90,79,.65);color:var(--red);
+  animation:sevPulse 2s ease-in-out infinite}
+@keyframes sevPulse{0%,100%{opacity:1}50%{opacity:.65}}

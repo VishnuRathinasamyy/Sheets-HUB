@@ -26,6 +26,8 @@ let sheets=[], cloudUsers=[], teams=[], entries=[], tasks=[], settings={};
 let activeId=null, editingSheetId=null, editingUserKey=null, currentView="welcome";
 let folders=[], editingFolderId=null, openFolders=JSON.parse(localStorage.getItem("odea_openfolders")||"{}");
 let approvals=[], apprFilter="all";
+let missed=[], mdlTab="today", mdlSort={col:"date",dir:-1};
+let clients=[];
 let calls=[], activeCall=null, ringTimer=null, ringCtx=null, ringStop=null, dnd=localStorage.getItem("odea_dnd")==="1";
 const RING_SECONDS=30;
 let archTab="appr", archSort={col:"created",dir:-1};
@@ -135,7 +137,14 @@ function bootCloud(){
       updateApprBadge(); notifyCheck();
       if($("apprModal").classList.contains("on"))renderApprovals();
       if(currentView==="myday")renderMyDay();});
-        db.ref("calls").on("value",s=>{const v=s.val()||{};
+    db.ref("clients").on("value",s=>{const v=s.val()||{};
+      clients=Object.keys(v).map(k=>({id:k,name:v[k].name})).sort((a,b)=>a.name.localeCompare(b.name));
+      renderClientChips();
+      if($("mdlModal").classList.contains("on")&&mdlTab==="today")renderMdl();});
+    db.ref("missed").on("value",s=>{const v=s.val()||{};
+      missed=Object.keys(v).map(k=>({id:k,...v[k]})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+      if($("mdlModal").classList.contains("on"))renderMdl();});
+    db.ref("calls").on("value",s=>{const v=s.val()||{};
       calls=Object.keys(v).map(k=>({id:k,...v[k]}));
       handleCalls();});
     db.ref("settings").on("value",s=>{settings=s.val()||{};
@@ -194,6 +203,7 @@ function enterApp(){
   $("mydayBtn")&&($("mydayBtn").style.display=co?"none":"");
   $("apprBtn")&&($("apprBtn").style.display=co?"none":"");
   $("archBtn")&&($("archBtn").style.display=co?"none":"");
+  $("mdlBtn")&&($("mdlBtn").style.display=canSeeMdl()?"":"none");
   isCoordinator()?showWelcome():showMyDay();
   renderFolders(); updateTaskBadge();
     askNotifyPermission();
@@ -772,7 +782,7 @@ function delTeam(id){
 /* ---------- SETTINGS ---------- */
 function openSettings(){
   $("archiveUrl").value=settings.archiveUrl||"";
-  renderTeamDependents();openModal("settingsModal");
+  renderTeamDependents();renderClientChips();openModal("settingsModal");
 }
 function saveSettings(){
   if(!isAdminNow())return;
@@ -1945,4 +1955,273 @@ function renderMyDay(){
   const nw=$("stage").querySelector(".myday");
   if(nw&&sy)nw.scrollTop=sy;
   if(wasFocused&&$("in_"+m))$("in_"+m).focus();
+}
+
+
+
+
+
+
+/* ================= MISSED DEADLINES ================= */
+function canSeeMdl(){
+  return !isCoordinator();      // everyone except coordinators
+}
+function openMissed(){
+  if(!canSeeMdl())return;
+  mdlTab="today"; document.querySelectorAll("[data-m]").forEach(b=>b.classList.toggle("on",b.dataset.m==="today"));
+  renderMdl(); openModal("mdlModal");
+}
+function setMdlTab(t){
+  mdlTab=t;
+  document.querySelectorAll("[data-m]").forEach(b=>b.classList.toggle("on",b.dataset.m===t));
+  renderMdl();
+}
+function mdlMonths(){
+  const s={}; missed.forEach(r=>{ if(r.date)s[r.date.slice(0,7)]=1; });
+  const k=Object.keys(s).sort().reverse();
+  if(!k.length)k.push(todayIST().slice(0,7));
+  return k;
+}
+function sortMdl(c){ mdlSort=(mdlSort.col===c)?{col:c,dir:-mdlSort.dir}:{col:c,dir:-1}; renderMdl(); }
+function mdlFiltered(){
+  const mk=$("mdlMonth")?$("mdlMonth").value:"all";
+  const q=$("mdlSearch")?$("mdlSearch").value.trim().toLowerCase():"";
+  const sev=$("mdlSev")?$("mdlSev").value:"";
+  const st=$("mdlStatus")?$("mdlStatus").value:"";
+  let r=missed.slice();
+  if(!isAdminNow())r=r.filter(x=>x.user===me().user||canSeeMdl());
+  if(mk&&mk!=="all")r=r.filter(x=>x.date&&x.date.startsWith(mk));
+  if(sev)r=r.filter(x=>(x.severity||"medium")===sev);
+  if(st)r=r.filter(x=>(x.status||"open")===st);
+  const cl=$("mdlClient")?$("mdlClient").value:"";
+  if(cl)r=r.filter(x=>x.client===cl);
+  if(q)r=r.filter(x=>(x.task+" "+x.reason+" "+x.client+" "+displayName(x.user)+" "+(x.action||"")).toLowerCase().includes(q));
+  const c=mdlSort.col,d=mdlSort.dir;
+  return r.sort((a,b)=>{const x=a[c]??"",y=b[c]??"";
+    return (typeof x==="number"&&typeof y==="number")?(x-y)*d:String(x).localeCompare(String(y))*d;});
+}
+function renderMdl(){
+  $("mdlSub").textContent = mdlTab==="today"
+    ? "Log a task that missed its deadline — be honest, this is for learning not blame."
+    : mdlTab==="stats" ? "Patterns across the team — spot what keeps slipping."
+    : "Everything logged, month by month.";
+  $("mdlTools").innerHTML = mdlTab==="today" ? "" : `
+    <input id="mdlSearch" class="arch-search" placeholder="🔍 Search…" oninput="renderMdl()">
+    <select class="f-input arch-select" id="mdlSev" onchange="renderMdl()">
+      <option value="">All severity</option><option value="low">Low</option>
+      <option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+    <select class="f-input arch-select" id="mdlStatus" onchange="renderMdl()">
+      <option value="">All status</option><option value="open">Open</option>
+      <option value="recovered">Recovered</option><option value="closed">Closed</option></select>
+    <select class="f-input arch-select" id="mdlClient" onchange="renderMdl()">
+      <option value="">All clients</option>${clientNames().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select>
+    <select class="f-input arch-select" id="mdlMonth" onchange="renderMdl()">
+      <option value="all">All months</option>${mdlMonths().map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join("")}</select>
+    <button class="btn ghost-btn arch-export" onclick="exportMdl()">⬇ CSV</button>`;
+  if(mdlTab==="today")renderMdlForm();
+  else if(mdlTab==="stats")renderMdlStats();
+  else renderMdlTable();
+}
+function renderMdlForm(){
+  const today=missed.filter(r=>r.date===todayIST());
+  $("mdlBody").innerHTML=`
+    <div class="mdl-form">
+      <div class="mdl-row">
+        <div class="field"><label>Who</label>
+          <select class="f-input" id="mdTaskUser">${allUsers().filter(u=>u.role!=="coordinator")
+            .map(u=>`<option value="${esc(u.user)}" ${u.user===me().user?"selected":""}>${esc(u.name||cap(u.user))}</option>`).join("")}</select></div>
+        <div class="field"><label>Client / project</label>
+          <div style="display:flex;gap:8px">
+            <select class="f-input" id="mdClient" style="flex:1">
+              <option value="">— Select client —</option>
+              ${clientNames().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}
+              <option value="__internal">Internal / no client</option>
+            </select>
+            ${isAdminNow()?`<button class="btn mini-add todo" style="flex:none;padding:0 14px" title="Add new client" onclick="quickAddClient()">+</button>`:""}
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>What was the task</label><input id="mdTask" placeholder="e.g. Instagram reel — final delivery"></div>
+      <div class="mdl-row">
+        <div class="field"><label>Deadline was</label><input type="date" id="mdDue" value="${todayIST()}"></div>
+        <div class="field"><label>Severity</label>
+          <select class="f-input" id="mdSev">
+            <option value="low">Low — internal only</option>
+            <option value="medium" selected>Medium — noticed</option>
+            <option value="high">High — client affected</option>
+            <option value="critical">Critical — revenue/trust hit</option></select></div>
+      </div>
+      <div class="field"><label>Why did it slip</label><textarea id="mdReason" rows="2" placeholder="Honest reason — dependency delay, scope change, underestimated, etc."></textarea></div>
+      <div class="field"><label>What's being done about it</label><textarea id="mdAction" rows="2" placeholder="Recovery plan / new promised date"></textarea></div>
+      <div class="mdl-row">
+        <div class="field"><label>New promised date</label><input type="date" id="mdNewDate"></div>
+        <div class="field"><label>Delay (days)</label><input type="number" id="mdDelay" min="0" placeholder="e.g. 2"></div>
+      </div>
+      <button class="btn btn-royal" onclick="saveMissed()">Log this missed deadline</button>
+    </div>
+    <h4 class="md-sub" style="margin-top:22px">Logged today (${today.length})</h4>
+    <div class="arch-wrap"><table class="arch-table">
+      <thead><tr><th>#</th><th>Who</th><th>Task</th><th>Client</th><th>Severity</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+      <tbody>${today.map((r,i)=>mdlRow(r,i+1,true)).join("")||`<tr><td colspan="8" class="arch-empty">Nothing logged today 🎉</td></tr>`}</tbody>
+    </table></div>`;
+}
+function mdlRow(r,n,compact){
+  const canEdit=isAdminNow()||r.by===me().user;
+  return `<tr>
+    <td>${n}</td>
+    <td><b style="color:var(--orange)">${esc(displayName(r.user))}</b></td>
+    <td class="t-title"><b>${esc(r.task)}</b>${r.action?`<small class="t-note" style="color:var(--gold)">↻ ${esc(r.action)}</small>`:""}</td>
+    <td>${esc(r.client||"—")}</td>
+    <td><span class="sev ${r.severity||"medium"}">${(r.severity||"medium").toUpperCase()}</span></td>
+    <td class="t-wrap">${esc(r.reason||"—")}</td>
+    <td><span class="st-pill ${r.status==="recovered"?"approved":r.status==="closed"?"completed":"pending"}">${r.status==="recovered"?"Recovered":r.status==="closed"?"Closed":"Open"}</span></td>
+    <td>${canEdit?`<button class="btn tiny-btn" title="Change status" onclick="cycleMdl('${r.id}')">↻</button><button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}</td>
+  </tr>`;
+}
+function renderMdlTable(){
+  const rows=mdlFiltered();
+  const th=(k,l)=>`<th onclick="sortMdl('${k}')" class="${mdlSort.col===k?"sorted":""}">${l}${mdlSort.col===k?(mdlSort.dir>0?" ▲":" ▼"):""}</th>`;
+  $("mdlBody").innerHTML=`
+    <div class="arch-wrap"><table class="arch-table">
+      <thead><tr><th>#</th>${th("date","Date")}${th("user","Who")}${th("task","Task")}${th("client","Client")}
+      ${th("severity","Severity")}${th("delay","Delay")}<th>Reason</th><th>Recovery</th>${th("status","Status")}<th></th></tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr>
+        <td>${i+1}</td>
+        <td>${fmtDate(r.ts)}</td>
+        <td><b style="color:var(--orange)">${esc(displayName(r.user))}</b></td>
+        <td class="t-title"><b>${esc(r.task)}</b></td>
+        <td>${esc(r.client||"—")}</td>
+        <td><span class="sev ${r.severity||"medium"}">${(r.severity||"medium").toUpperCase()}</span></td>
+        <td class="t-days">${r.delay?r.delay+"d":"—"}</td>
+        <td class="t-wrap">${esc(r.reason||"—")}</td>
+        <td class="t-wrap" style="color:var(--gold)">${esc(r.action||"—")}</td>
+        <td><span class="st-pill ${r.status==="recovered"?"approved":r.status==="closed"?"completed":"pending"}">${r.status==="recovered"?"Recovered":r.status==="closed"?"Closed":"Open"}</span></td>
+        <td>${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn" onclick="cycleMdl('${r.id}')">↻</button><button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}</td>
+      </tr>`).join("")||`<tr><td colspan="11" class="arch-empty">Nothing found</td></tr>`}</tbody>
+    </table></div>
+    <div class="arch-foot">${rows.length} record${rows.length===1?"":"s"}</div>`;
+}
+function renderMdlStats(){
+  const rows=mdlFiltered();
+  const by={},reasons={},clients={};
+  rows.forEach(r=>{
+    const u=r.user;
+    const s=by[u]=by[u]||{n:0,days:0,crit:0,open:0};
+    s.n++; s.days+=Number(r.delay||0);
+    if(r.severity==="critical"||r.severity==="high")s.crit++;
+    if((r.status||"open")==="open")s.open++;
+    const k=(r.reason||"").trim().toLowerCase().slice(0,28);
+    if(k)reasons[k]=(reasons[k]||0)+1;
+    if(r.client)clients[r.client]=(clients[r.client]||0)+1;
+  });
+  const people=Object.keys(by).sort((a,b)=>by[b].n-by[a].n);
+  const topR=Object.keys(reasons).sort((a,b)=>reasons[b]-reasons[a]).slice(0,5);
+  const topC=Object.keys(clients).sort((a,b)=>clients[b]-clients[a]).slice(0,5);
+  const totDays=rows.reduce((s,r)=>s+Number(r.delay||0),0);
+  $("mdlBody").innerHTML=`
+    <div class="arch-stats">
+      <div class="stat"><b>${rows.length}</b><small>Total misses</small></div>
+      <div class="stat bad"><b>${rows.filter(r=>r.severity==="critical").length}</b><small>Critical</small></div>
+      <div class="stat warn"><b>${rows.filter(r=>(r.status||"open")==="open").length}</b><small>Still open</small></div>
+      <div class="stat ok"><b>${rows.filter(r=>r.status==="recovered").length}</b><small>Recovered</small></div>
+      <div class="stat"><b>${totDays}</b><small>Total delay days</small></div>
+    </div>
+    <div class="md-grid" style="margin-top:14px">
+      <section class="md-panel">
+        <h3>👤 By person</h3>
+        <div class="md-list">${people.map(u=>`
+          <div class="md-item"><div class="md-item-top">
+            <b>${esc(displayName(u))}</b><span class="md-age ${by[u].crit?"hot":""}">${by[u].n}</span></div>
+            <small>${by[u].days} delay days · ${by[u].crit} high/critical · ${by[u].open} open</small>
+          </div>`).join("")||'<div class="mc-empty">No data</div>'}</div>
+      </section>
+      <section class="md-panel">
+        <h3>🔁 Recurring reasons</h3>
+        <div class="md-list">${topR.map(k=>`
+          <div class="md-item"><div class="md-item-top"><b>${esc(k)}</b><span class="md-age">${reasons[k]}×</span></div></div>`).join("")||'<div class="mc-empty">No data</div>'}</div>
+        <h4 class="md-sub">Most affected clients</h4>
+        <div class="md-list">${topC.map(k=>`
+          <div class="md-item"><div class="md-item-top"><b>${esc(k)}</b><span class="md-age">${clients[k]}×</span></div></div>`).join("")||'<div class="mc-empty">No data</div>'}</div>
+      </section>
+    </div>`;
+}
+function saveMissed(){
+  if(!canSeeMdl()||!cloudOn)return;
+  const task=$("mdTask").value.trim();
+  if(!task){toast("What was the task?");return;}
+  const reason=$("mdReason").value.trim();
+  if(!reason){toast("Please give a reason — that's the useful part");return;}
+  db.ref("missed").push({
+    user:$("mdTaskUser").value, task,
+    client:($("mdClient").value==="__internal"?"Internal":$("mdClient").value),
+    due:$("mdDue").value||todayIST(), severity:$("mdSev").value,
+    reason, action:$("mdAction").value.trim(), newDate:$("mdNewDate").value||"",
+    delay:Number($("mdDelay").value||0), status:"open",
+    by:me().user, date:todayIST(), ts:Date.now()
+  }).then(()=>{
+    ["mdTask","mdReason","mdAction","mdNewDate","mdDelay"].forEach(i=>$(i).value="");
+    $("mdClient").value="";
+    toast("Logged ✓");
+  });
+}
+function cycleMdl(id){
+  const r=missed.find(x=>x.id===id);if(!r)return;
+  if(!isAdminNow()&&r.by!==me().user)return;
+  const next={open:"recovered",recovered:"closed",closed:"open"}[r.status||"open"];
+  db.ref("missed/"+id+"/status").set(next);
+}
+function delMissed(id){
+  const r=missed.find(x=>x.id===id);if(!r)return;
+  if(!isAdminNow()&&r.by!==me().user)return;
+  askConfirm("Delete this record?","It will be removed from the history permanently.",
+    ()=>db.ref("missed/"+id).remove(),"Yes, delete");
+}
+function exportMdl(){
+  const rows=mdlFiltered();
+  const head=["Date","Who","Task","Client","Deadline","Severity","Delay days","Reason","Recovery","New date","Status","Logged by"];
+  const csv=[head.join(",")].concat(rows.map(r=>[
+    fmtDate(r.ts),displayName(r.user),r.task,r.client,r.due,r.severity,r.delay,
+    r.reason,r.action,r.newDate,r.status,displayName(r.by)
+  ].map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(","))).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="ODEA_MissedDeadlines.csv"; a.click();
+  toast("CSV downloaded ✓");
+}
+
+/* ---------- clients ---------- */
+function clientNames(){return clients.map(c=>c.name);}
+function renderClientChips(){
+  const el=$("clientChips");if(!el)return;
+  el.innerHTML=clients.map(c=>`<span class="team-chip">${esc(c.name)}<button onclick="delClient('${c.id}')" title="Remove">✕</button></span>`).join("")
+    ||'<small style="color:var(--cream-dim)">No clients yet</small>';
+}
+function addClient(){
+  if(!isAdminNow()){toast("Only admins can manage clients");return;}
+  const n=$("newClientName").value.trim();
+  if(!n){toast("Type a client name");return;}
+  if(clientNames().some(c=>c.toLowerCase()===n.toLowerCase())){toast("That client already exists");return;}
+  db.ref("clients").push({name:n,ts:Date.now()});
+  $("newClientName").value="";toast("Client added ✓");
+}
+function delClient(id){
+  if(!isAdminNow())return;
+  const c=clients.find(x=>x.id===id);if(!c)return;
+  askConfirm("Remove “"+c.name+"”?","Existing records keep this name — it just won't appear in the dropdown.",
+    ()=>db.ref("clients/"+id).remove(),"Yes, remove");
+}
+function quickAddClient(){
+  const n=prompt("New client / project name:");
+  if(n===null)return;
+  const nm=n.trim();
+  if(!nm)return;
+  if(clientNames().some(c=>c.toLowerCase()===nm.toLowerCase())){
+    toast("Already exists — selecting it");
+    setTimeout(()=>{const s=$("mdClient");if(s)s.value=nm;},400);
+    $("mdClient").value=nm;return;
+  }
+  db.ref("clients").push({name:nm,ts:Date.now()}).then(()=>{
+    setTimeout(()=>{const s=$("mdClient");if(s)s.value=nm;},500);
+    toast("“"+nm+"” added ✓");
+  });
 }
