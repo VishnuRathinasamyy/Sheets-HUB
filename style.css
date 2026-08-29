@@ -836,3 +836,25 @@ body.light *{scrollbar-color:rgba(241,90,34,.45) transparent}
 .sev.critical{background:rgba(232,90,79,.22);border:1px solid rgba(232,90,79,.65);color:var(--red);
   animation:sevPulse 2s ease-in-out infinite}
 @keyframes sevPulse{0%,100%{opacity:1}50%{opacity:.65}}
+
+/* Topbar scrolls horizontally instead of pushing off-screen */
+.topbar{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:none}
+.topbar::-webkit-scrollbar{display:none}
+.topbar h2{flex:0 1 auto;min-width:40px}
+.topbar .top-btn,.topbar .icon-btn,.topbar .burger{flex:0 0 auto}
+@media (max-width:860px){
+  .topbar{gap:6px;padding:10px 8px}
+  .topbar .top-btn{padding:9px 10px;font-size:15px}
+  .topbar h2{font-size:14px;max-width:120px}
+}
+@media (max-width:600px){
+  .topbar h2{display:none}          /* title hides — buttons get the room */
+}
+body,html{overflow-x:hidden}
+
+
+/* On a birthday card, shift the call button left so the ribbon is visible */
+.bday-card-on .call-btn{right:auto;left:50%;transform:translateX(-50%);top:8px}
+.bday-card-on .call-btn:hover{transform:translateX(-50%) scale(1.15) rotate(-10deg)}
+.bday-card-on .bday-bow{top:4px;right:4px}
+.bday-card-on .call-btn{right:auto;left:calc(100% - 96px);top:8px}
