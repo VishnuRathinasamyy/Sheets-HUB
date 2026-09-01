@@ -996,13 +996,15 @@ function renderTasks(){
       <div class="task-top">
         ${t.priority==="high"?`<span class="pri high">HIGH</span>`:t.priority==="low"?`<span class="pri low">LOW</span>`:""}
         <b>${esc(t.title)}</b></div>
-      <div class="task-meta">To: ${esc(who)} · By ${esc(displayName(t.by))} · ${new Date(t.ts).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
+      <div class="task-meta">To: ${esc(who)} · By ${esc(displayName(t.by))} · ${new Date(t.ts).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}${t.edited?" · <i>edited</i>":""}</div>
       <div class="task-body">${sanitize(t.body||"")}</div>
       <div class="task-actions">
         ${t.status==="open"?`<button class="btn chip-btn ok" onclick="doneTask('${t.id}')">✓ Mark done</button>`:`<span class="chip-btn ok" style="cursor:default">Completed</span>`}
         ${isForMe?(iNoted?`<span class="chip-btn noted-on" style="cursor:default">👁 Noted</span>`
                         :`<button class="btn chip-btn" onclick="noteTask('${t.id}')">👁 Noted</button>`):""}
         <button class="btn chip-btn" onclick="toggleReply('${t.id}')">💬 Reply${reps.length?" ("+reps.length+")":""}</button>
+        ${canEditContent(t)?`<button class="btn chip-btn" onclick="editItem('task','${t.id}')">✏️ Edit (${editLeft(t)}m)</button>`:""}
+        ${canEditPriority(t)?`<button class="btn chip-btn" onclick="cyclePriority('task','${t.id}')">⚑ Priority</button>`:""}
         ${canDel?`<button class="btn chip-btn" onclick="delTask('${t.id}')">Delete</button>`:""}
       </div>
       ${notedBy.length?`<div class="noted-strip">${notedBy.map(n=>`<span class="noted-badge">👁 ${esc(displayName(n))} noted</span>`).join("")}</div>`:""}
@@ -1165,7 +1167,8 @@ function renderApprovals(){
       </div>
       <div class="task-meta">From ${esc(displayName(a.by))} · To ${esc(who)} · ${new Date(a.ts).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
       ${a.decidedAt?` · by ${esc(displayName(a.decidedBy))} · hides in ${left}h`:""}
-      ${a.undoneBy&&a.status==="pending"?` · <span style="color:var(--gold)">↩ undone by ${esc(displayName(a.undoneBy))}</span>`:""}</div>
+      ${a.undoneBy&&a.status==="pending"?` · <span style="color:var(--gold)">↩ undone by ${esc(displayName(a.undoneBy))}</span>`:""}
+      ${a.edited?" · <i>edited</i>":""}</div>
       ${a.body?`<div class="task-body">${sanitize(a.body)}</div>`:""}
       ${a.link?`<a class="appr-link" href="${esc(a.link)}" target="_blank">🔗 Open attachment</a>`:""}
       ${a.reason?`<div class="appr-reason">✎ ${esc(a.reason)}
@@ -1176,6 +1179,8 @@ function renderApprovals(){
         ${(mineReq&&a.status==="rejected")?`<button class="btn chip-btn" onclick="reopenAppr('${a.id}')">↻ Resubmit</button>`:""}
         ${(canUndo(a)||(isAdminNow()&&a.status!=="pending"))?`<button class="btn chip-btn undo-btn" onclick="undoDecision('${a.id}')">↩ Undo${canUndo(a)?" ("+Math.max(1,Math.ceil((UNDO_WINDOW-(Date.now()-(a.decidedAt||0)))/60000))+"m)":""}</button>`:""}
         <button class="btn chip-btn" onclick="toggleApprReply('${a.id}')">💬 Reply${reps.length?" ("+reps.length+")":""}</button>
+        ${canEditContent(a)?`<button class="btn chip-btn" onclick="editItem('appr','${a.id}')">✏️ Edit (${editLeft(a)}m)</button>`:""}
+        ${canEditPriority(a)?`<button class="btn chip-btn" onclick="cyclePriority('appr','${a.id}')">⚑ Priority</button>`:""}
         ${(mineReq||isAdminNow())?`<button class="btn chip-btn" onclick="delApproval('${a.id}')">Delete</button>`:""}
       </div>
       <div class="reply-box" id="ab_${a.id}">
@@ -2088,7 +2093,7 @@ function mdlRow(r,n,compact){
     <td><span class="sev ${r.severity||"medium"}">${(r.severity||"medium").toUpperCase()}</span></td>
     <td class="t-wrap">${esc(r.reason||"—")}</td>
     <td><span class="st-pill ${r.status==="recovered"?"approved":r.status==="closed"?"completed":"pending"}">${r.status==="recovered"?"Recovered":r.status==="closed"?"Closed":"Open"}</span></td>
-    <td>${canEdit?`<button class="btn tiny-btn" title="Change status" onclick="cycleMdl('${r.id}')">↻</button><button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}</td>
+    <td>${canEdit?`${mdlLocked(r)?`<span class="tiny-btn" title="Locked — finalised" style="cursor:default;opacity:.45">🔒</span>`:`<button class="btn tiny-btn" title="Edit" onclick="editMissed('${r.id}')">✏️</button>`}<button class="btn tiny-btn" title="Status: ${r.status||"open"} → next" onclick="cycleMdl('${r.id}')">↻</button>${(!mdlLocked(r)||isAdminNow())?`<button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}`:""}</td>
   </tr>`;
 }
 function renderMdlTable(){
@@ -2112,7 +2117,7 @@ function renderMdlTable(){
         <td class="t-wrap">${esc(r.reason||"—")}</td>
         <td class="t-wrap" style="color:var(--gold)">${esc(r.action||"—")}</td>
         <td><span class="st-pill ${r.status==="recovered"?"approved":r.status==="closed"?"completed":"pending"}">${r.status==="recovered"?"Recovered":r.status==="closed"?"Closed":"Open"}</span></td>
-        <td>${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn" onclick="cycleMdl('${r.id}')">↻</button><button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}</td>
+        <td>${(isAdminNow()||r.by===me().user)?`${mdlLocked(r)?`<span class="tiny-btn" title="Locked — finalised" style="cursor:default;opacity:.45">🔒</span>`:`<button class="btn tiny-btn" title="Edit" onclick="editMissed('${r.id}')">✏️</button>`}<button class="btn tiny-btn" title="Status: ${r.status||"open"} → next" onclick="cycleMdl('${r.id}')">↻</button>${(!mdlLocked(r)||isAdminNow())?`<button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}`:""}</td>
       </tr>`).join("")||`<tr><td colspan="13" class="arch-empty">Nothing found</td></tr>`}</tbody>
     </table></div>
     <div class="arch-foot">${rows.length} record${rows.length===1?"":"s"}</div>`;
@@ -2180,15 +2185,25 @@ function saveMissed(){
     toast("Logged ✓");
   });
 }
+
+
+const MDL_LOCK=12*60*60*1000;
+function mdlLocked(r){
+  const s=r.status||"open";
+  if(s==="open")return false;                       // open records stay editable
+  return (Date.now()-(r.decidedAt||r.ts||0))>MDL_LOCK;
+}
+
 function cycleMdl(id){
   const r=missed.find(x=>x.id===id);if(!r)return;
   if(!isAdminNow()&&r.by!==me().user)return;
   const next={open:"recovered",recovered:"closed",closed:"open"}[r.status||"open"];
-  db.ref("missed/"+id+"/status").set(next);
+  db.ref("missed/"+id).update({status:next,decidedAt:Date.now()});
 }
 function delMissed(id){
   const r=missed.find(x=>x.id===id);if(!r)return;
   if(!isAdminNow()&&r.by!==me().user)return;
+  if(mdlLocked(r)&&!isAdminNow()){toast("🔒 Locked — finalised records can't be deleted");return;}
   askConfirm("Delete this record?","It will be removed from the history permanently.",
     ()=>db.ref("missed/"+id).remove(),"Yes, delete");
 }
@@ -2240,4 +2255,67 @@ function quickAddClient(){
     setTimeout(()=>{const s=$("mdClient");if(s)s.value=nm;},500);
     toast("“"+nm+"” added ✓");
   });
+}
+
+
+
+
+
+
+/* ================= EDIT TASKS / APPROVALS / MISSED ================= */
+const EDIT_WINDOW=10*60*1000;   // 10 minutes to edit title & details
+
+function canEditContent(x){
+  if(!x)return false;
+  if(x.by!==me().user&&!isAdminNow())return false;
+  return (Date.now()-(x.ts||0))<EDIT_WINDOW;
+}
+function canEditPriority(x){
+  return !!x && (x.by===me().user||isAdminNow());   // no time limit
+}
+function editLeft(x){
+  const ms=EDIT_WINDOW-(Date.now()-(x.ts||0));
+  return ms>0?Math.max(1,Math.ceil(ms/60000)):0;
+}
+/* ---- priority (anytime) ---- */
+function cyclePriority(kind,id){
+  const base=kind==="task"?tasks:approvals;
+  const x=base.find(i=>i.id===id);if(!x)return;
+  if(!canEditPriority(x)){toast("Only the creator or an admin can change priority");return;}
+  const next={low:"normal",normal:"high",high:"low"}[x.priority||"normal"];
+  db.ref((kind==="task"?"tasks/":"approvals/")+id+"/priority").set(next)
+    .then(()=>toast("Priority → "+next.toUpperCase()));
+}
+/* ---- title + details (10 min) ---- */
+function editItem(kind,id){
+  const base=kind==="task"?tasks:approvals;
+  const x=base.find(i=>i.id===id);if(!x)return;
+  if(!canEditContent(x)){toast("The 10-minute edit window has passed");return;}
+  const t=prompt("Edit title:",x.title||"");
+  if(t===null)return;
+  const title=t.trim();
+  if(!title){toast("Title can't be empty");return;}
+  const plain=(x.body||"").replace(/<br\s*\/?>/gi,"\n").replace(/<[^>]+>/g,"").trim();
+  const b=prompt("Edit details (plain text):",plain);
+  if(b===null)return;
+  const body=b.trim()?esc(b.trim()).replace(/\n/g,"<br>"):"";
+  db.ref((kind==="task"?"tasks/":"approvals/")+id)
+    .update({title,body,edited:Date.now(),editedBy:me().user})
+    .then(()=>toast("Updated ✓"));
+}
+/* ---- missed deadline record ---- */
+function editMissed(id){
+  const r=missed.find(x=>x.id===id);if(!r)return;
+  if(!isAdminNow()&&r.by!==me().user){toast("Only the person who logged it can edit");return;}
+  if(mdlLocked(r)){toast("🔒 Locked — this record was finalised over 12 hours ago");return;}
+  const t=prompt("Edit the task name:",r.task||"");
+  if(t===null)return;
+  const task=t.trim();
+  if(!task){toast("Task can't be empty");return;}
+  const rs=prompt("Edit the reason:",r.reason||"");
+  if(rs===null)return;
+  const ac=prompt("Edit the recovery plan:",r.action||"");
+  if(ac===null)return;
+  db.ref("missed/"+id).update({task,reason:rs.trim(),action:ac.trim(),
+    edited:Date.now(),editedBy:me().user}).then(()=>toast("Record updated ✓"));
 }

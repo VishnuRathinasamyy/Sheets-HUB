@@ -861,3 +861,5 @@ body,html{overflow-x:hidden}
 .bday-card-on .call-btn:hover{transform:translateX(-50%) scale(1.15) rotate(-10deg)}
 .bday-card-on .bday-bow{top:4px;right:4px}
 .bday-card-on .call-btn{right:auto;left:calc(100% - 96px);top:8px}
+
+.task-meta i,.md-item small i{font-style:italic;opacity:.65}
