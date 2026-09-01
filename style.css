@@ -852,6 +852,9 @@ body.light *{scrollbar-color:rgba(241,90,34,.45) transparent}
 }
 body,html{overflow-x:hidden}
 
+.overdue{color:var(--red);font-weight:800}
+.overdue::after{content:" ⚠"}
+
 
 /* On a birthday card, shift the call button left so the ribbon is visible */
 .bday-card-on .call-btn{right:auto;left:50%;transform:translateX(-50%);top:8px}

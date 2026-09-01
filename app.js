@@ -970,11 +970,16 @@ function popAlert(kind,text,sub,fromUser,uid){
 }
 function openTasks(){renderTasks();openModal("tasksModal");}
 function relevantTasks(){
-  if(isAdminNow())return tasks;
   const m=me();
-  return tasks.filter(t=>
-    (t.by===m.user)||   // tasks I assigned
+  const list=isAdminNow()?tasks.slice():tasks.filter(t=>
+    (t.by===m.user)||
     (t.to&&((t.to.users&&t.to.users[m.user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x])))));
+  const rank={high:0,normal:1,low:2};
+  return list.sort((a,b)=>{
+    if((a.status==="open")!==(b.status==="open"))return a.status==="open"?-1:1;
+    const r=(rank[a.priority||"normal"])-(rank[b.priority||"normal"]);
+    return r||((b.ts||0)-(a.ts||0));
+  });
 }
 function renderTasks(){
   const admin=isAdminNow();
@@ -988,7 +993,9 @@ function renderTasks(){
     const isForMe=!!(t.to&&((t.to.users&&t.to.users[me().user])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
     const reps=t.replies?Object.keys(t.replies).map(k=>({id:k,...t.replies[k]})).sort((a,b)=>a.ts-b.ts):[];
     return `<div class="task-card ${t.status==="open"?"open":"done-t"}">
-      <div class="task-top"><b>${esc(t.title)}</b></div>
+      <div class="task-top">
+        ${t.priority==="high"?`<span class="pri high">HIGH</span>`:t.priority==="low"?`<span class="pri low">LOW</span>`:""}
+        <b>${esc(t.title)}</b></div>
       <div class="task-meta">To: ${esc(who)} · By ${esc(displayName(t.by))} · ${new Date(t.ts).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
       <div class="task-body">${sanitize(t.body||"")}</div>
       <div class="task-actions">
@@ -1017,7 +1024,7 @@ function renderTasks(){
   }).join("")||'<div class="mc-empty" style="padding:10px">No tasks here yet 🎉</div>';
 }
 function openCompose(){
-  $("taskTitle").value="";$("taskBody").innerHTML="";
+  $("taskTitle").value="";$("taskBody").innerHTML="";$("taskPriority").value="normal";
   const ac=$("assignChecks");
   ac.innerHTML=teamNames().map(n=>`<label class="check-pill"><input type="checkbox" data-kind="team" value="${esc(n)}"> 👥 ${esc(n)}</label>`).join("")+
     allUsers().filter(u=>u.role!=="coordinator").map(u=>`<label class="check-pill"><input type="checkbox" data-kind="user" value="${esc(u.user)}"> ${esc(u.name||cap(u.user))}</label>`).join("");
@@ -1033,7 +1040,8 @@ function assignTask(){
   $("assignChecks").querySelectorAll("input:checked").forEach(i=>{
     if(i.dataset.kind==="team")to.teams[i.value]=true;else to.users[i.value]=true;});
   if(!Object.keys(to.users).length&&!Object.keys(to.teams).length){toast("Tick at least one person or team");return;}
-  db.ref("tasks").push({title,body,to,by:me().user,ts:Date.now(),status:"open"})
+  db.ref("tasks").push({title,body,to,priority:$("taskPriority").value,
+    by:me().user,ts:Date.now(),status:"open"})
     .then(()=>toast("Task assigned ✓"));
   closeModal("composeModal");
 }
@@ -1340,7 +1348,7 @@ function archRows(){
     decidedBy:t.noted?Object.keys(t.noted).map(displayName).join(", "):"—",
     created:t.ts||0, closed:t.doneAt||0,
     days:daysBetween(t.ts,t.doneAt),
-    priority:"—",
+    priority:t.priority||"normal",
     replies:t.replies?Object.keys(t.replies).length:0,
     note:""
   }));
@@ -1418,7 +1426,7 @@ function renderArchive(){
       ${th("created","Created")}
       ${th("closed",isAppr?"Decided":"Completed")}
       ${th("days","Days")}
-      ${isAppr?th("priority","Priority"):""}
+      ${th("priority","Priority")}
       ${th("replies","💬")}
     </tr></thead>
     <tbody>${rows.map(r=>`
@@ -1431,7 +1439,7 @@ function renderArchive(){
         <td>${fmtDate(r.created)}</td>
         <td>${fmtDate(r.closed)}</td>
         <td class="t-days">${r.days===null?"—":r.days===0?"same day":r.days+"d"}</td>
-        ${isAppr?`<td><span class="pri ${r.priority}">${r.priority==="high"?"HIGH":r.priority==="low"?"LOW":"—"}</span></td>`:""}
+        <td><span class="pri ${r.priority}">${r.priority==="high"?"HIGH":r.priority==="low"?"LOW":"—"}</span></td>
         <td>${r.replies||"—"}</td>
       </tr>`).join("")||`<tr><td colspan="10" class="arch-empty">Nothing found for this month</td></tr>`}
     </tbody>`;
@@ -1440,10 +1448,10 @@ function renderArchive(){
 }
 function exportArchive(){
   const rows=archFiltered(), isAppr=archTab==="appr";
-  const head=["Title","Raised by","Sent to","Status",isAppr?"Decided by":"Noted by","Created","Closed","Days",isAppr?"Priority":"","Replies","Note"];
+  const head=["Title","Raised by","Sent to","Status",isAppr?"Decided by":"Noted by","Created","Closed","Days","Priority","Replies","Note"];
   const csv=[head.join(",")].concat(rows.map(r=>[
     r.title,r.from,r.to,r.status,r.decidedBy,fmtDateTime(r.created),fmtDateTime(r.closed),
-    r.days===null?"":r.days,isAppr?r.priority:"",r.replies,r.note
+    r.days===null?"":r.days,r.priority,r.replies,r.note
   ].map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(","))).join("\n");
   const mk=$("archMonth").value;
   const a=document.createElement("a");
@@ -1868,7 +1876,9 @@ function renderMyDay(){
     const age=Math.floor((Date.now()-(t.ts||Date.now()))/86400000);
     const who=sent?namesOf(t.to):displayName(t.by);
     return `<div class="md-item">
-      <div class="md-item-top"><b>${esc(t.title)}</b>
+      <div class="md-item-top">
+        ${t.priority==="high"?`<span class="pri high">HIGH</span>`:t.priority==="low"?`<span class="pri low">LOW</span>`:""}
+        <b>${esc(t.title)}</b>
         ${age>2?`<span class="md-age ${age>6?"hot":""}">${age}d</span>`:""}</div>
       <small>${sent?"To":"From"} ${esc(who)}</small>
       <div class="md-item-act">
@@ -2087,20 +2097,23 @@ function renderMdlTable(){
   $("mdlBody").innerHTML=`
     <div class="arch-wrap"><table class="arch-table">
       <thead><tr><th>#</th>${th("date","Date")}${th("user","Who")}${th("task","Task")}${th("client","Client")}
-      ${th("severity","Severity")}${th("delay","Delay")}<th>Reason</th><th>Recovery</th>${th("status","Status")}<th></th></tr></thead>
+      ${th("due","Was due")}${th("newDate","New date")}${th("severity","Severity")}${th("delay","Delay")}
+      <th>Reason</th><th>Recovery</th>${th("status","Status")}<th></th></tr></thead>
       <tbody>${rows.map((r,i)=>`<tr>
         <td>${i+1}</td>
         <td>${fmtDate(r.ts)}</td>
         <td><b style="color:var(--orange)">${esc(displayName(r.user))}</b></td>
         <td class="t-title"><b>${esc(r.task)}</b></td>
         <td>${esc(r.client||"—")}</td>
+        <td>${r.due?fmtDate(new Date(r.due).getTime()):"—"}</td>
+        <td class="t-days">${r.newDate?`<span class="${new Date(r.newDate)<new Date()&&(r.status||"open")==="open"?"overdue":""}">${fmtDate(new Date(r.newDate).getTime())}</span>`:"—"}</td>
         <td><span class="sev ${r.severity||"medium"}">${(r.severity||"medium").toUpperCase()}</span></td>
         <td class="t-days">${r.delay?r.delay+"d":"—"}</td>
         <td class="t-wrap">${esc(r.reason||"—")}</td>
         <td class="t-wrap" style="color:var(--gold)">${esc(r.action||"—")}</td>
         <td><span class="st-pill ${r.status==="recovered"?"approved":r.status==="closed"?"completed":"pending"}">${r.status==="recovered"?"Recovered":r.status==="closed"?"Closed":"Open"}</span></td>
         <td>${(isAdminNow()||r.by===me().user)?`<button class="btn tiny-btn" onclick="cycleMdl('${r.id}')">↻</button><button class="btn tiny-btn danger" onclick="delMissed('${r.id}')">✕</button>`:""}</td>
-      </tr>`).join("")||`<tr><td colspan="11" class="arch-empty">Nothing found</td></tr>`}</tbody>
+      </tr>`).join("")||`<tr><td colspan="13" class="arch-empty">Nothing found</td></tr>`}</tbody>
     </table></div>
     <div class="arch-foot">${rows.length} record${rows.length===1?"":"s"}</div>`;
 }

@@ -149,6 +149,13 @@
     <h3>Assign a task</h3>
     <p class="m-sub">Write the task, style it, tick who gets it. They'll see a notification the moment they're on the dashboard.</p>
     <div class="field"><label>Task title</label><input id="taskTitle" placeholder="e.g. SmartCliff proposal revisions"></div>
+    <div class="field"><label>Priority</label>
+      <select class="f-input" id="taskPriority">
+        <option value="normal">Normal</option>
+        <option value="high">High — needed today</option>
+        <option value="low">Low — whenever</option>
+      </select>
+    </div>
     <label style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:7px">Details</label>
     <div class="editor-tools">
       <button class="btn ed-btn" onclick="fmt('bold')" title="Bold"><b>B</b></button>
