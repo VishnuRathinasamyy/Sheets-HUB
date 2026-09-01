@@ -1046,7 +1046,10 @@ function isApprover(a){
 }
 function liveApprovals(){
   const cut=Date.now()-HIDE_AFTER;
-  return approvals.filter(a=>a.status==="pending"||(a.decidedAt||0)>cut);
+  return approvals.filter(a=>
+    a.status==="pending" ||
+    a.status==="rejected" ||          // corrections stay until resubmitted
+    (a.decidedAt||0)>cut);
 }
 function myApprovals(){
   const m=me().user;
