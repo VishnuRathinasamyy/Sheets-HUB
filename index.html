@@ -75,6 +75,7 @@
     <div class="topbar">
       <button class="btn burger" id="burgerBtn" onclick="smartToggle()">◀</button>
       <h2 id="stageTitle"><span class="live-dot"></span>Welcome</h2>
+      <div class="top-actions">
             <button class="btn top-btn" id="mdlBtn" onclick="openMissed()" style="background:linear-gradient(120deg,#E85A4F,#A32A20);border-color:transparent;color:#fff;font-weight:700">⏱️ <span class="lbl">Missed Deadlines</span></button>
       <button class="btn top-btn" id="archBtn" onclick="openArchiveData()">🗄️ <span class="lbl">Archive</span></button>
       <button class="btn top-btn" id="mydayBtn" onclick="showMyDay()" style="background:linear-gradient(120deg,#7A5CE0,#4B2FA8);border-color:transparent;color:#fff;font-weight:700">☀️ <span class="lbl">My Day</span></button>
@@ -83,6 +84,7 @@
       <button class="btn icon-btn" id="themeBtn" onclick="toggleTheme()" title="Theme">🌙</button>
       <button class="btn top-btn" id="apprBtn" onclick="openApprovals()">✅ <span class="lbl">Approvals</span><span class="badge" id="apprBadge"></span></button>
       <a class="top-btn" id="openExt" href="#" target="_blank" style="display:none">↗ <span class="lbl">Open in Google</span></a>
+      </div>
     </div>
     <div class="stage" id="stage"></div>
   </main>
@@ -137,7 +139,8 @@
   <div class="modal">
     <h3>Tasks</h3>
     <p class="m-sub" id="tasksSub">Tasks assigned to you appear here.</p>
-    <button class="btn btn-royal" id="newTaskBtn" style="margin:0 0 18px" onclick="openCompose()">+ Assign a task</button>
+    <button class="btn btn-royal" id="newTaskBtn" style="margin:0 0 16px" onclick="openCompose()">+ Assign a task</button>
+    <div class="appr-filters" id="taskFilters"></div>
     <div id="taskRows"></div>
     <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('tasksModal')">Close</button></div>
   </div>
@@ -259,11 +262,7 @@
     <h3>Approvals</h3>
     <p class="m-sub" id="apprSub">Requests waiting on you, and requests you sent.</p>
     <button class="btn btn-royal" style="margin-bottom:16px" onclick="openApprCompose()">+ Request an approval</button>
-    <div class="appr-filters">
-      <button class="btn chip-btn af on" data-f="all" onclick="setApprFilter('all')">All</button>
-      <button class="btn chip-btn af" data-f="pending" onclick="setApprFilter('pending')">Pending</button>
-      <button class="btn chip-btn af" data-f="mine" onclick="setApprFilter('mine')">My requests</button>
-    </div>
+    <div class="appr-filters" id="apprFilters"></div>
     <div id="apprRows"></div>
     <div class="m-row"><button class="btn btn-cancel" onclick="closeModal('apprModal')">Close</button></div>
   </div>

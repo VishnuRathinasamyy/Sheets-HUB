@@ -837,19 +837,26 @@ body.light *{scrollbar-color:rgba(241,90,34,.45) transparent}
   animation:sevPulse 2s ease-in-out infinite}
 @keyframes sevPulse{0%,100%{opacity:1}50%{opacity:.65}}
 
-/* Topbar scrolls horizontally instead of pushing off-screen */
-.topbar{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:none}
-.topbar::-webkit-scrollbar{display:none}
+/* Topbar: buttons stay right-aligned, strip scrolls when needed */
+.topbar{overflow:visible;flex-wrap:nowrap}
 .topbar h2{flex:0 1 auto;min-width:40px}
-.topbar .top-btn,.topbar .icon-btn,.topbar .burger{flex:0 0 auto}
+.topbar .burger{flex:0 0 auto}
+.top-actions{
+  display:flex;align-items:center;gap:10px;
+  margin-left:auto;                 /* pushes the group to the right edge */
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;max-width:100%;
+  justify-content:flex-end;
+}
+.top-actions::-webkit-scrollbar{display:none}
+.top-actions>*{flex:0 0 auto}
 @media (max-width:860px){
   .topbar{gap:6px;padding:10px 8px}
+  .top-actions{gap:6px;justify-content:flex-start}   /* scrollable on small screens */
   .topbar .top-btn{padding:9px 10px;font-size:15px}
-  .topbar h2{font-size:14px;max-width:120px}
+  .topbar h2{font-size:14px;max-width:110px}
 }
-@media (max-width:600px){
-  .topbar h2{display:none}          /* title hides — buttons get the room */
-}
+@media (max-width:600px){.topbar h2{display:none}}
 body,html{overflow-x:hidden}
 
 .overdue{color:var(--red);font-weight:800}
@@ -863,3 +870,11 @@ body,html{overflow-x:hidden}
 .bday-card-on .call-btn{right:auto;left:calc(100% - 96px);top:8px}
 
 .task-meta i,.md-item small i{font-style:italic;opacity:.65}
+
+
+/* task filter setup */
+.appr-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip-btn.af i{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;font-style:normal;
+  font-size:10.5px;font-weight:800;background:rgba(255,255,255,.14)}
+.chip-btn.af.on i{background:rgba(255,255,255,.28)}
+.chip-btn.af.on{opacity:1;background:rgba(241,90,34,.2);border-color:var(--glass-border-hot);color:var(--orange)}

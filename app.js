@@ -25,7 +25,7 @@ let db=null, cloudOn=false;
 let sheets=[], cloudUsers=[], teams=[], entries=[], tasks=[], settings={};
 let activeId=null, editingSheetId=null, editingUserKey=null, currentView="welcome";
 let folders=[], editingFolderId=null, openFolders=JSON.parse(localStorage.getItem("odea_openfolders")||"{}");
-let approvals=[], apprFilter="all";
+let approvals=[], apprFilter="all", taskFilter="all";
 let missed=[], mdlTab="today", mdlSort={col:"date",dir:-1};
 let clients=[];
 let calls=[], activeCall=null, ringTimer=null, ringCtx=null, ringStop=null, dnd=localStorage.getItem("odea_dnd")==="1";
@@ -981,11 +981,37 @@ function relevantTasks(){
     return r||((b.ts||0)-(a.ts||0));
   });
 }
+function setTaskFilter(f){taskFilter=f;renderTasks();}
+function taskCounts(){
+  const m=me().user, cut=Date.now()-HIDE_AFTER;
+  const base=relevantTasks().filter(t=>t.status==="open"||(t.doneAt||0)>cut);
+  return {
+    all:base.length,
+    pending:base.filter(t=>t.status==="open"&&t.to&&
+      ((t.to.users&&t.to.users[m])||(t.to.teams&&myTeams().some(x=>t.to.teams[x])))).length,
+    mine:base.filter(t=>t.by===m).length,
+    done:base.filter(t=>t.status==="done").length
+  };
+}
+function applyTaskFilter(list){
+  const m=me().user;
+  if(taskFilter==="pending")return list.filter(t=>t.status==="open"&&t.to&&
+    ((t.to.users&&t.to.users[m])||(t.to.teams&&myTeams().some(x=>t.to.teams[x]))));
+  if(taskFilter==="mine")return list.filter(t=>t.by===m);
+  if(taskFilter==="done")return list.filter(t=>t.status==="done");
+  return list;
+}
 function renderTasks(){
   const admin=isAdminNow();
   $("tasksSub").textContent=admin?"All tasks across the team.":"Tasks assigned to you, and tasks you assigned.";
   const cut=Date.now()-HIDE_AFTER;
-  $("taskRows").innerHTML=relevantTasks().filter(t=>t.status==="open"||(t.doneAt||0)>cut).map(t=>{
+  const c=taskCounts();
+  $("taskFilters").innerHTML=`
+    <button class="btn chip-btn af ${taskFilter==="all"?"on":""}" onclick="setTaskFilter('all')">All <i>${c.all}</i></button>
+    <button class="btn chip-btn af ${taskFilter==="pending"?"on":""}" onclick="setTaskFilter('pending')">For me <i>${c.pending}</i></button>
+    <button class="btn chip-btn af ${taskFilter==="mine"?"on":""}" onclick="setTaskFilter('mine')">Assigned by me <i>${c.mine}</i></button>
+    <button class="btn chip-btn af ${taskFilter==="done"?"on":""}" onclick="setTaskFilter('done')">Completed <i>${c.done}</i></button>`;
+  $("taskRows").innerHTML=applyTaskFilter(relevantTasks().filter(t=>t.status==="open"||(t.doneAt||0)>cut)).map(t=>{
     const who=[...(t.to?.teams?Object.keys(t.to.teams):[]),...(t.to?.users?Object.keys(t.to.users).map(displayName):[])].join(", ");
     const canDel=admin||t.by===me().user;
     const notedBy=t.noted?Object.keys(t.noted):[];
@@ -1072,11 +1098,7 @@ function updateApprBadge(){
   b.style.display=n?"flex":"none";b.textContent=n;
 }
 function openApprovals(){renderApprovals();openModal("apprModal");}
-function setApprFilter(f){
-  apprFilter=f;
-  document.querySelectorAll(".af").forEach(b=>b.classList.toggle("on",b.dataset.f===f));
-  renderApprovals();
-}
+function setApprFilter(f){apprFilter=f;renderApprovals();}
 function openApprCompose(){
   $("apprTitle").value="";$("apprLink").value="";$("apprBody").innerHTML="";$("apprPriority").value="normal";
   $("apprChecks").innerHTML=teamNames().map(n=>`<label class="check-pill"><input type="checkbox" data-kind="team" value="${esc(n)}"> 👥 ${esc(n)}</label>`).join("")+
@@ -1150,9 +1172,22 @@ function toggleApprReply(id){
 }
 function renderApprovals(){
   const m=me().user;
-  let list=myApprovals();
-  if(apprFilter==="pending")list=list.filter(a=>a.status==="pending");
+  const all=myApprovals();
+  const cnt={
+    all:all.length,
+    pending:all.filter(a=>a.status==="pending"&&isApprover(a)).length,
+    mine:all.filter(a=>a.by===m).length,
+    fix:all.filter(a=>a.status==="rejected").length
+  };
+  $("apprFilters").innerHTML=`
+    <button class="btn chip-btn af ${apprFilter==="all"?"on":""}" onclick="setApprFilter('all')">All <i>${cnt.all}</i></button>
+    <button class="btn chip-btn af ${apprFilter==="pending"?"on":""}" onclick="setApprFilter('pending')">Waiting on me <i>${cnt.pending}</i></button>
+    <button class="btn chip-btn af ${apprFilter==="mine"?"on":""}" onclick="setApprFilter('mine')">My requests <i>${cnt.mine}</i></button>
+    <button class="btn chip-btn af ${apprFilter==="fix"?"on":""}" onclick="setApprFilter('fix')">Needs correction <i>${cnt.fix}</i></button>`;
+  let list=all;
+  if(apprFilter==="pending")list=list.filter(a=>a.status==="pending"&&isApprover(a));
   if(apprFilter==="mine")list=list.filter(a=>a.by===m);
+  if(apprFilter==="fix")list=list.filter(a=>a.status==="rejected");
   $("apprSub").textContent=isAdminNow()?"All approval requests across the team.":"Requests waiting on you, and requests you sent.";
   $("apprRows").innerHTML=list.map(a=>{
     const who=[...(a.to?.teams?Object.keys(a.to.teams):[]),...(a.to?.users?Object.keys(a.to.users).map(displayName):[])].join(", ");
