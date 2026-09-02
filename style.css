@@ -878,3 +878,9 @@ body,html{overflow-x:hidden}
   font-size:10.5px;font-weight:800;background:rgba(255,255,255,.14)}
 .chip-btn.af.on i{background:rgba(255,255,255,.28)}
 .chip-btn.af.on{opacity:1;background:rgba(241,90,34,.2);border-color:var(--glass-border-hot);color:var(--orange)}
+
+/* Let notification badges escape the scrolling strip */
+.top-actions{padding:8px 2px;overflow-y:visible}
+.topbar{padding-top:6px;padding-bottom:6px}
+.top-btn{overflow:visible}
+.badge{top:-4px;right:-4px;z-index:6}
